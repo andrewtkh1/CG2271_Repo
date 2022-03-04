@@ -1,0 +1,228 @@
+#include "MKL25Z4.h"                    // Device header
+#define RED_LED 18 // PortB Pin 18
+#define GREEN_LED 19 // PortB Pin 19
+#define BLUE_LED 1 // PortD Pin 1
+#define MASK(x) (1 << (x))
+#define SW_POS 6
+#define PTB0_Pin 0
+#define PTB1_Pin 1
+#define BAUD_RATE 115200
+#define UART_TX_PORTE22 22
+#define UART_RX_PORTE23 23
+//set priroity level for interrupt
+#define UART2_INT_PRIO 128
+volatile uint8_t rx_data;
+
+
+void initUART2(uint32_t baud_rate)
+{
+	uint32_t divisor, bus_clock;
+	
+	//enable clock to uart2 and porte
+	SIM->SCGC4 |= SIM_SCGC4_UART2_MASK;
+	SIM->SCGC5 |= SIM_SCGC5_PORTE_MASK;
+	
+	//connect UART pins for PTE22,PTE23
+	PORTE->PCR[UART_TX_PORTE22] &= ~PORT_PCR_MUX_MASK;
+	PORTE->PCR[UART_TX_PORTE22] |= PORT_PCR_MUX(4);
+	
+	PORTE->PCR[UART_RX_PORTE23] &= ~PORT_PCR_MUX_MASK;
+	PORTE->PCR[UART_RX_PORTE23] |= PORT_PCR_MUX(4);
+	
+	//Ensure Tx and Rx are disable before configuration
+	UART2->C2 &= ~((UART_C2_TE_MASK) | (UART_C2_RE_MASK));
+	
+	// set baud rate to desired value
+	bus_clock = (DEFAULT_SYSTEM_CLOCK)/2;
+	divisor = bus_clock / (baud_rate * 16);
+	UART2->BDH = UART_BDH_SBR(divisor >> 8);
+	UART2->BDL = UART_BDL_SBR(divisor);
+	
+	//No pairity, 8 bits
+	UART2->C1 = 0;
+	UART2->S2 = 0;
+	UART2->C3 = 0;
+	
+	// enable TX and RX
+	UART2->C2 |= ((UART_C2_TE_MASK) | (UART_C2_RE_MASK));
+}
+
+// UART TRASMIT POLL
+void UART2_Transmit_Poll(uint8_t data)
+{
+	while(!(UART2->S1 & UART_S1_TDRE_MASK));
+	UART2->D = data;
+}
+
+// UART recieve Poll
+uint8_t UART2_Receive_Poll(void)
+{
+	//wait until receive date register is full
+	while(!(UART2->S1 & UART_S1_RDRF_MASK));
+	return (UART2->D);
+}
+	
+
+void initPWM(void)
+{
+	//enable clock for port B
+	SIM_SCGC5 |= SIM_SCGC5_PORTB_MASK;
+	
+	//enable pin output and set mux TO 3 to use alt 3 for time in port b 01 n 1
+	PORTB->PCR[PTB0_Pin] &= ~PORT_PCR_MUX_MASK;
+	PORTB->PCR[PTB0_Pin] |= PORT_PCR_MUX(3);
+	
+	PORTB->PCR[PTB0_Pin] &= ~PORT_PCR_MUX_MASK;
+	PORTB->PCR[PTB0_Pin] |= PORT_PCR_MUX(3);
+	
+	//enable clock gating for timer module
+	SIM->SCGC6 |= SIM_SCGC6_TPM1_MASK;
+	
+	//Select clock used
+	SIM->SOPT2 &= ~SIM_SOPT2_TPMSRC_MASK;
+	SIM->SOPT2 |= SIM_SOPT2_TPMSRC(1);
+	
+	//choose mod value
+	TPM1->MOD = 7500;
+	
+	// edge aligned pwm
+	//ps: 111(128) and CMOD=01
+	TPM1->SC &= ~((TPM_SC_CMOD_MASK | (TPM_SC_PS_MASK)));
+	TPM1->SC |= (TPM_SC_CMOD(1) | (TPM_SC_PS(7)));
+	// set to up counting
+	TPM1->SC &= ~(TPM_SC_CPWMS_MASK);
+	
+	// Enable PWM on TPM1 channe; 0 -> PTB0
+	//start from high output first 
+	TPM1_C0SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK) );
+  TPM1_C0SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
+	
+	// Enable PWM on TPM1 channe; 0 -> PTB1
+	TPM1_C1SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK) );
+  TPM1_C1SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
+	
+}
+
+typedef enum led_colors
+{
+	red = RED_LED, green = GREEN_LED, blue = BLUE_LED
+}led_colors_t;
+
+void InitGPIO(void)
+{
+	// Enable Clock to PORTB and PORTD
+	SIM->SCGC5 |= ((SIM_SCGC5_PORTB_MASK) | (SIM_SCGC5_PORTD_MASK));
+	
+	// Configure MUX settings to make all 3 pins GPIO
+	PORTB->PCR[RED_LED] &= ~PORT_PCR_MUX_MASK;
+	PORTB->PCR[RED_LED] |= PORT_PCR_MUX(1);
+	
+	PORTB->PCR[GREEN_LED] &= ~PORT_PCR_MUX_MASK;
+	PORTB->PCR[GREEN_LED] |= PORT_PCR_MUX(1);
+	
+	PORTD->PCR[BLUE_LED] &= ~PORT_PCR_MUX_MASK;
+	PORTD->PCR[BLUE_LED] |= PORT_PCR_MUX(1);
+	
+	// Set Data Direction Registers for PortB and PortD
+	PTB->PDDR |= (MASK(RED_LED) | MASK(GREEN_LED));
+	PTD->PDDR |= MASK(BLUE_LED);
+}
+
+void InitSwitch(void){
+	
+	// enable clock port D
+	SIM->SCGC5 |= (SIM_SCGC5_PORTD_MASK);
+	
+	// set Port D to an input  ( why is &=)
+	PTD->PDDR &= ~MASK(SW_POS);
+	
+	/* configure mux to GPIO and enable pull up resistor
+	 * and configure interrupt on falling edge of pin connected
+	 * to switch
+	 */
+	PORTD->PCR[SW_POS] &= ~PORT_PCR_MUX_MASK; 
+	PORTD->PCR[SW_POS] |= (PORT_PCR_MUX(1) | PORT_PCR_PE_MASK | PORT_PCR_PS_MASK | PORT_PCR_IRQC(0B1010));
+	
+	
+	// enable interupts
+	NVIC_SetPriority(PORTD_IRQn, 2);
+	NVIC_ClearPendingIRQ(PORTD_IRQn);
+	NVIC_EnableIRQ(PORTD_IRQn);
+	
+}
+
+/* Delay Function */
+static void delay(volatile uint32_t nof) {
+  while(nof!=0) {
+    __asm("NOP");
+    nof--;
+	}
+}
+
+void offlled(void){
+	PTB ->PSOR = (MASK(RED_LED) | MASK(GREEN_LED));
+	PTD ->PSOR = (MASK(BLUE_LED));
+}
+
+void led_control(led_colors_t colour)
+{			
+	offlled();
+	switch (colour)
+	{
+		case red:
+			PTB -> PCOR = MASK(RED_LED); // SET 0
+			//delay(0x80000);
+			break;
+		case green:
+			PTB -> PCOR = MASK(GREEN_LED); // SET 0
+			//delay(0x80000);
+			break;
+		case blue:
+			PTD -> PCOR = MASK(BLUE_LED); // SET 0
+			//delay(0x80000);
+			break;
+		default:
+			offlled();
+	}
+}
+
+
+
+int main(void)
+{
+	
+	SystemCoreClockUpdate();
+	initUART2(BAUD_RATE);
+	InitGPIO();
+	offlled();
+	uint8_t x =0; 
+	while (1)
+	{
+		rx_data = UART2_Receive_Poll();
+		
+		
+		if (rx_data == 0x1) {
+			
+			led_control(red);
+			x= rx_data;
+			//PTB -> PCOR = MASK(RED_LED);
+			//PTB ->PSOR = (MASK(GREEN_LED));
+			//PTD ->PSOR = (MASK(BLUE_LED));
+		} else if (rx_data  == 0x2) {
+			led_control(green);
+			//PTB -> PCOR = MASK(GREEN_LED); // SET 0
+			//PTD ->PSOR = (MASK(BLUE_LED));
+			//PTB ->PSOR = (MASK(RED_LED));
+		} else if (rx_data  == 0x3) {
+			//PTD -> PCOR = MASK(BLUE_LED); // SET 0
+			//PTB ->PSOR = (MASK(RED_LED));
+			//PTB ->PSOR = (MASK(GREEN_LED));
+			led_control(blue);
+		
+		} else {
+			led_control(blue);
+		}
+		
+
+	}
+}
