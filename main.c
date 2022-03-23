@@ -9,6 +9,12 @@
 #include "system_MKL25Z4.h"   	         // Keil::Device:Startup
 #include "cmsis_os2.h"
 
+//Variables for interrupt
+#define BAUD_RATE 115200
+#define UART_RX_PORTE23 23
+#define UART2_INT_PRIO 64
+volatile uint8_t rx_data;
+
 #define TOP_LEFT_WHEEL_FWD	30 					// PORT E pin 30 TM0 CH2 FWD
 #define TOP_LEFT_WHEEL_REV	29 					// PORT E pin 29 TM0 CH3 REV
 #define BOT_LEFT_WHEEL_FWD 22 					// Tmp2 Ch0 Forward
@@ -18,6 +24,50 @@
 #define BOT_RIGHT_WHEEL_REV 21					// TPM1 Ch1 REV
 #define BOT_RIGHT_WHEEL_FWD 20					// Tpm1 Ch0 FWD
 #define MASK(x) (1 << (x)) 
+
+void initUART2Interrupt(){
+    //Enable RIE so that when we are ready to receive, the interrupt would also be triggered and we can do some action.
+    UART2->C2 = UART2_C2 | UART_C2_RIE_MASK;
+
+    //Enable interrupt for USART2 so that the interrupt can be triggered.
+    NVIC_EnableIRQ(UART2_IRQn);
+}
+
+void initUART2(uint32_t baud_rate)
+{
+	uint32_t divisor, bus_clock;
+	
+	//enable clock to uart2 and porte
+	SIM->SCGC4 |= SIM_SCGC4_UART2_MASK;
+	
+	//connect UART pins for PTE23
+
+	PORTE->PCR[UART_RX_PORTE23] &= ~PORT_PCR_MUX_MASK;
+	PORTE->PCR[UART_RX_PORTE23] |= PORT_PCR_MUX(4);
+	
+	//Ensure Rx is disable before configuration
+	UART2->C2 &= ~(UART_C2_RE_MASK);
+	
+	// set baud rate to desired value
+	bus_clock = (DEFAULT_SYSTEM_CLOCK)/2;
+	divisor = bus_clock / (baud_rate * 16);
+	UART2->BDH = UART_BDH_SBR(divisor >> 8);
+	UART2->BDL = UART_BDL_SBR(divisor);
+	
+	// set piroity fot interrupt uart
+	NVIC_SetPriority(UART2_IRQn, UART2_INT_PRIO);
+	NVIC_ClearPendingIRQ(UART2_IRQn);
+	NVIC_EnableIRQ(UART2_IRQn);
+
+	initUART2Interrupt();
+	//No pairity, 8 bits
+	UART2->C1 = 0;
+	UART2->S2 = 0;
+	UART2->C3 = 0;
+	
+	// enable RX
+	UART2->C2 |= (UART_C2_RE_MASK);
+}
 
 void initPWM(){
 	SIM->SCGC5 |= SIM_SCGC5_PORTC_MASK;
@@ -105,6 +155,16 @@ void initPWM(){
 	TPM0->MOD = 7500;
 }
 
+//UART2 ISR
+void UART2_IRQHandler(void){
+    NVIC_ClearPendingIRQ(UART2_IRQn);
+    //We need to check which one triggered the ISR as send and receive both triggers the same ISR.
+    //Check to see if read was the one that triggered the ISR.
+    if (UART2->S1 & UART_S1_RDRF_MASK){
+         rx_data = UART2->D;
+    }
+}
+
 static void delay(volatile uint32_t nof) {
   while(nof!=0) {
     __asm("NOP");
@@ -126,7 +186,6 @@ static void delay(volatile uint32_t nof) {
 					TPM1_C1V = Bot left Reverse
 */
 void app_main (void *argument) {
- 
   // ...
 	int flag = 0;
   for (;;) {
@@ -198,7 +257,8 @@ int main (void) {
   // System Initialization
   SystemCoreClockUpdate();
 	initPWM();
-	  
+	//initUART2(BAUD_RATE);
+	
 	int flag = 0;
 	TPM2_C0V = 0;
 	TPM2_C1V = 0;
