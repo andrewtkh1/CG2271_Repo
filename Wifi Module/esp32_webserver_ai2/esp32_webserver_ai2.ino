@@ -40,7 +40,7 @@ IPAddress secondaryDNS(8, 8, 4, 4);
 
 void setup() {
   Serial.begin(115200);
-  Serial2.begin(9600, SERIAL_8N1, RXD2, TXD2);
+  Serial2.begin(115200, SERIAL_8N1, RXD2, TXD2);
   // Initialize the output variables as outputs
   pinMode(output26, OUTPUT);
   // Set outputs to LOW
@@ -124,8 +124,9 @@ void loop() {
     {
       toggleLED();
       response = "Reverse Movement";
-      Serial2.write(0x02);
+      //Serial2.write(0x02);
       dx = 2;
+      Serial2.write(dx);
     }
 
   if(req.indexOf("left") != -1)
@@ -152,7 +153,7 @@ void loop() {
     dx = 0;
   }
 
-  Serial2.write(dx);
+  //Serial2.write(dx);
   
   /*
        if (req.indexOf("on12") != -1) {digitalWrite(LED12, HIGH); estado = "LED12 ON";}

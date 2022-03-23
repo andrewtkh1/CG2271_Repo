@@ -13,7 +13,7 @@
 #define BAUD_RATE 115200
 #define UART_RX_PORTE23 23
 #define UART2_INT_PRIO 64
-volatile uint8_t rx_data;
+volatile uint16_t rx_data;
 
 #define TOP_LEFT_WHEEL_FWD	30 					// PORT E pin 30 TM0 CH2 FWD
 #define TOP_LEFT_WHEEL_REV	29 					// PORT E pin 29 TM0 CH3 REV
@@ -27,7 +27,6 @@ volatile uint8_t rx_data;
 
 void initUART2Interrupt(){
     //Enable RIE so that when we are ready to receive, the interrupt would also be triggered and we can do some action.
-    UART2->C2 = UART2_C2 | UART_C2_RIE_MASK;
 
     //Enable interrupt for USART2 so that the interrupt can be triggered.
     NVIC_EnableIRQ(UART2_IRQn);
@@ -39,7 +38,7 @@ void initUART2(uint32_t baud_rate)
 	
 	//enable clock to uart2 and porte
 	SIM->SCGC4 |= SIM_SCGC4_UART2_MASK;
-	
+	SIM->SCGC5 |= SIM_SCGC5_PORTE_MASK;
 	//connect UART pins for PTE23
 
 	PORTE->PCR[UART_RX_PORTE23] &= ~PORT_PCR_MUX_MASK;
@@ -58,6 +57,7 @@ void initUART2(uint32_t baud_rate)
 	NVIC_SetPriority(UART2_IRQn, UART2_INT_PRIO);
 	NVIC_ClearPendingIRQ(UART2_IRQn);
 	NVIC_EnableIRQ(UART2_IRQn);
+	UART2->C2 |= UART_C2_RIE_MASK;
 
 	initUART2Interrupt();
 	//No pairity, 8 bits
@@ -155,16 +155,6 @@ void initPWM(){
 	TPM0->MOD = 7500;
 }
 
-//UART2 ISR
-void UART2_IRQHandler(void){
-    NVIC_ClearPendingIRQ(UART2_IRQn);
-    //We need to check which one triggered the ISR as send and receive both triggers the same ISR.
-    //Check to see if read was the one that triggered the ISR.
-    if (UART2->S1 & UART_S1_RDRF_MASK){
-         rx_data = UART2->D;
-    }
-}
-
 static void delay(volatile uint32_t nof) {
   while(nof!=0) {
     __asm("NOP");
@@ -183,8 +173,112 @@ static void delay(volatile uint32_t nof) {
 					TPM0_C4V = Top right Forward
 					TPM0_C5V = Top right Reverse
 					TPM1_C0V = Bot right Forward
-					TPM1_C1V = Bot left Reverse
+					TPM1_C1V = Bot right Reverse
 */
+
+void stopBot(){
+	TPM2_C0V = 0;
+	TPM2_C1V = 0;
+	TPM0_C2V = 0;
+	TPM0_C3V = 0;
+	TPM0_C4V = 0;
+	TPM0_C5V = 0;
+	TPM1_C0V = 0;
+	TPM1_C1V = 0;
+}
+
+void forward(){
+ 	TPM2_C0V = 0x0EA6; 	//Bot left Forward
+	TPM2_C1V = 0; 			//Bot left Reverse
+	TPM0_C2V = 0x0EA6;	//Top left Forward
+	TPM0_C3V = 0;				//Top left Reverse
+	TPM0_C4V = 0x0EA6;	//Top right Forward
+	TPM0_C5V = 0;				//Top right Reverse
+	TPM1_C0V = 0x0EA6;	//Bot right Forward
+	TPM1_C1V = 0;				//Bot right Reverse
+}
+
+void reverse(){
+	TPM2_C0V = 0; 			//Bot left Forward
+	TPM2_C1V = 0x0EA6; 	//Bot left Reverse
+	TPM0_C2V = 0;				//Top left Forward
+	TPM0_C3V = 0x0EA6;	//Top left Reverse
+	TPM0_C4V = 0;				//Top right Forward
+	TPM0_C5V = 0x0EA6;	//Top right Reverse
+	TPM1_C0V = 0;				//Bot right Forward
+	TPM1_C1V = 0x0EA6;	//Bot right Reverse
+}
+
+void turnRight(){
+	TPM2_C0V = 0x0EA6; 	//Bot left Forward
+	TPM2_C1V = 0;				//Bot left Reverse
+	TPM0_C2V = 0x0EA6;	//Top left Forward
+	TPM0_C3V = 0;				//Top left Reverse
+	TPM0_C4V = 0;				//Top right Forward
+	TPM0_C5V = 0x0EA6;	//Top right Reverse
+	TPM1_C0V = 0;				//Bot right Forward
+	TPM1_C1V = 0x0EA6;	//Bot right Reverse
+}
+
+void turnLeft(){
+	TPM2_C0V = 0; 			//Bot left Forward
+	TPM2_C1V = 0x0EA6; 	//Bot left Reverse
+	TPM0_C2V = 0;				//Top left Forward
+	TPM0_C3V = 0x0EA6;	//Top left Reverse
+	TPM0_C4V = 0x0EA6;	//Top right Forward
+	TPM0_C5V = 0;				//Top right Reverse
+	TPM1_C0V = 0x0EA6;	//Bot right Forward
+	TPM1_C1V = 0;				//Bot right Reverse
+}
+
+//UART2 ISR
+void UART2_IRQHandler(void){
+	   if (UART2->S1 & UART_S1_RDRF_MASK) {
+			rx_data = UART2->D;
+		 }
+		 		// handle the error
+				// clear the flag
+		 if (UART2->S1 & (UART_S1_OR_MASK |
+			UART_S1_NF_MASK | 
+			UART_S1_FE_MASK | 
+			UART_S1_PF_MASK)) {
+				int s = 0;
+			}
+
+    //NVIC_ClearPendingIRQ(UART2_IRQn);
+    //We need to check which one triggered the ISR as send and receive both triggers the same ISR.
+    //Check to see if read was the one that triggered the ISR.
+    
+		//NVIC_EnableIRQ(UART2_IRQn);
+}
+
+void movement (void *argument) {
+	//To implement mutext or Queue to not waste CPU cycles.
+	for(;;){
+		if (rx_data == 0x0) {
+			stopBot();
+		} else if (rx_data == 0x1) {
+			forward();
+			//osDelay(1000);
+			//rx_data = 0;
+		} else if (rx_data == 0x2) {
+			reverse();
+			//osDelay(1000);
+			//rx_data = 0;
+		} else if (rx_data == 0x3) {
+			turnLeft();
+			//osDelay(1000);
+			//rx_data = 0;
+		} else if (rx_data == 0x04) {
+			turnRight();
+			//osDelay(1000);
+			//rx_data = 0;
+		} else {
+			stopBot();
+		}
+	}
+}
+
 void app_main (void *argument) {
   // ...
 	int flag = 0;
@@ -257,7 +351,7 @@ int main (void) {
   // System Initialization
   SystemCoreClockUpdate();
 	initPWM();
-	//initUART2(BAUD_RATE);
+	initUART2(BAUD_RATE);
 	
 	int flag = 0;
 	TPM2_C0V = 0;
@@ -274,67 +368,10 @@ int main (void) {
   // ...
 	
   osKernelInitialize();                 // Initialize CMSIS-RTOS
-  osThreadNew(app_main, NULL, NULL);   // Create application main thread
+  //osThreadNew(app_main, NULL, NULL);   // Create application main thread
+	osThreadNew(movement, NULL, NULL); 		//Thread for movements
   osKernelStart();                      // Start thread execution
   //int flag = 0;
 	for (;;) {
-		switch (flag){
-			case 0:
-					TPM2_C0V = 0x0EA6;
-					TPM2_C1V = 0;
-					TPM0_C2V = 0x0EA6;
-					TPM0_C3V = 0;
-					TPM0_C4V = 0x0EA6;
-					TPM0_C5V = 0;
-					TPM1_C0V = 0x0EA6;
-					TPM1_C1V = 0;
-					flag = 1;
-					break;
-			case 1:
-					TPM2_C0V = 0;
-					TPM2_C1V = 0;
-					TPM0_C2V = 0;
-					TPM0_C3V = 0;
-					TPM0_C4V = 0;
-					TPM0_C5V = 0;
-					TPM1_C0V = 0;
-					TPM1_C1V = 0;
-					flag = 2;
-					break;
-			case 2:
-					TPM2_C0V = 0;
-					TPM2_C1V = 0x0EA6;
-					TPM0_C2V = 0;
-					TPM0_C3V = 0x0EA6;
-					TPM0_C4V = 0;
-					TPM0_C5V = 0x0EA6;
-					TPM1_C0V = 0;
-					TPM1_C1V = 0x0EA6;
-					flag = 3;
-					break;
-			case 3:
-					TPM2_C0V = 0;
-					TPM2_C1V = 0;
-					TPM0_C2V = 0;
-					TPM0_C3V = 0;
-					TPM0_C4V = 0;
-					TPM0_C5V = 0;
-					TPM1_C0V = 0;
-					TPM1_C1V = 0;
-					flag = 0;
-					break;
-			default:
-					TPM2_C0V = 0x0EA6;
-					TPM2_C1V = 0;
-					TPM0_C2V = 0x0EA6;
-					TPM0_C3V = 0;
-					TPM0_C4V = 0x0EA6;
-					TPM0_C5V = 0;
-					TPM1_C0V = 0x0EA6;
-					TPM1_C1V = 0;
-					flag = 1;
-					break;
-		}
-	delay(0x80000);
 	}
 }
