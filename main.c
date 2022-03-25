@@ -10,7 +10,8 @@
 #include "cmsis_os2.h"
 
 //Variables for interrupt
-#define BAUD_RATE 115200
+//#define BAUD_RATE 115200
+#define BAUD_RATE 9600
 #define UART_RX_PORTE23 23
 #define UART2_INT_PRIO 64
 volatile uint16_t rx_data;
@@ -51,6 +52,7 @@ void initUART2(uint32_t baud_rate)
 	bus_clock = (DEFAULT_SYSTEM_CLOCK)/2;
 	divisor = bus_clock / (baud_rate * 16);
 	UART2->BDH = UART_BDH_SBR(divisor >> 8);
+	UART2->BDH |= UART_BDH_SBNS(0); // SHould be set stop bit to 1
 	UART2->BDL = UART_BDL_SBR(divisor);
 	
 	// set piroity fot interrupt uart
@@ -236,6 +238,11 @@ void UART2_IRQHandler(void){
 	   if (UART2->S1 & UART_S1_RDRF_MASK) {
 			rx_data = UART2->D;
 		 }
+		 
+		 if (UART2->S1 & UART_S1_TDRE_MASK) {
+			//UART2->D = 0;
+		 }
+		 
 		 		// handle the error
 				// clear the flag
 		 if (UART2->S1 & (UART_S1_OR_MASK |
@@ -255,7 +262,7 @@ void UART2_IRQHandler(void){
 void movement (void *argument) {
 	//To implement mutext or Queue to not waste CPU cycles.
 	for(;;){
-		if (rx_data == 0x0) {
+		if (rx_data == 0x0b) {
 			stopBot();
 		} else if (rx_data == 0x1) {
 			forward();
@@ -269,7 +276,7 @@ void movement (void *argument) {
 			turnLeft();
 			//osDelay(1000);
 			//rx_data = 0;
-		} else if (rx_data == 0x04) {
+		} else if (rx_data == 0x4) {
 			turnRight();
 			//osDelay(1000);
 			//rx_data = 0;
@@ -278,73 +285,6 @@ void movement (void *argument) {
 		}
 	}
 }
-
-void app_main (void *argument) {
-  // ...
-	int flag = 0;
-  for (;;) {
-		switch (flag){
-			case 0:
-					TPM2_C0V = 0x0EA6;
-					TPM2_C1V = 0;
-					TPM0_C2V = 0x0EA6;
-					TPM0_C3V = 0;
-					TPM0_C4V = 0x0EA6;
-					TPM0_C5V = 0;
-					TPM1_C0V = 0x0EA6;
-					TPM1_C1V = 0;
-					flag = 1;
-					break;
-			case 1:
-					TPM2_C0V = 0;
-					TPM2_C1V = 0;
-					TPM0_C2V = 0;
-					TPM0_C3V = 0;
-					TPM0_C4V = 0;
-					TPM0_C5V = 0;
-					TPM1_C0V = 0;
-					TPM1_C1V = 0;
-					flag = 2;
-					break;
-			case 2:
-					TPM2_C0V = 0;
-					TPM2_C1V = 0x0EA6;
-					TPM0_C2V = 0;
-					TPM0_C3V = 0x0EA6;
-					TPM0_C4V = 0;
-					TPM0_C5V = 0x0EA6;
-					TPM1_C0V = 0;
-					TPM1_C1V = 0x0EA6;
-					flag = 3;
-					break;
-			case 3:
-					TPM2_C0V = 0;
-					TPM2_C1V = 0;
-					TPM0_C2V = 0;
-					TPM0_C3V = 0;
-					TPM0_C4V = 0;
-					TPM0_C5V = 0;
-					TPM1_C0V = 0;
-					TPM1_C1V = 0;
-					flag = 0;
-					break;
-			default:
-					TPM2_C0V = 0x0EA6;
-					TPM2_C1V = 0;
-					TPM0_C2V = 0x0EA6;
-					TPM0_C3V = 0;
-					TPM0_C4V = 0x0EA6;
-					TPM0_C5V = 0;
-					TPM1_C0V = 0x0EA6;
-					TPM1_C1V = 0;
-					flag = 1;
-					break;
-		}
-		osDelay(2000);
-	}
-	//osDelay(2000);
-}
-
  
 int main (void) {
  
