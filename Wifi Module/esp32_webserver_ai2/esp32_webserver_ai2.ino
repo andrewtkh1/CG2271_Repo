@@ -18,7 +18,7 @@ String response, ip_address;
 String output26State = "off";
 
 // Assign output variables to GPIO pins
-const int output26 = 26;
+const int output23 = 23;
 bool flag = false;
 unsigned long dx = 0;
 
@@ -40,11 +40,11 @@ IPAddress secondaryDNS(8, 8, 4, 4);
 
 void setup() {
   Serial.begin(115200);
-  Serial2.begin(115200, SERIAL_8N1, RXD2, TXD2);
+  Serial2.begin(9600, SERIAL_8N1, RXD2, TXD2);
   // Initialize the output variables as outputs
-  pinMode(output26, OUTPUT);
+  pinMode(output23, OUTPUT);
   // Set outputs to LOW
-  digitalWrite(output26, LOW);
+  digitalWrite(output23, LOW);
 
   //Configure Static IP
 //  if(!WiFi.config(local_IP, gateway, subnet, primaryDNS, secondaryDNS))
@@ -72,11 +72,11 @@ void setup() {
 
 void toggleLED() {
   if (flag) {
-    digitalWrite(output26, HIGH);
+    digitalWrite(output23, HIGH);
     flag = false;
   } else {
     flag = true;
-    digitalWrite(output26, LOW);
+    digitalWrite(output23, LOW);
   }
 }
 
@@ -115,6 +115,7 @@ void loop() {
 
   if(req.indexOf("forward") != -1)
     {
+      toggleLED();
       response = "Forward Movement";
       Serial2.write(0x01);
       dx = 1;
@@ -141,7 +142,7 @@ void loop() {
   {
     toggleLED();
     response = "Right Movement";
-    Serial2.write(0x04);
+    Serial2.write(4);
     dx = 4;
   }
   
@@ -149,7 +150,7 @@ void loop() {
   {
     toggleLED();
     response = "Stop Movement";
-    Serial2.write(0x0);
+    Serial2.write(0b0);
     dx = 0;
   }
 
