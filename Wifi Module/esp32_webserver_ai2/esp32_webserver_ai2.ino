@@ -40,7 +40,7 @@ IPAddress secondaryDNS(8, 8, 4, 4);
 
 void setup() {
   Serial.begin(115200);
-  Serial2.begin(9600, SERIAL_8N1, RXD2, TXD2);
+  Serial2.begin(115200, SERIAL_8N1, RXD2, TXD2);
   // Initialize the output variables as outputs
   pinMode(output26, OUTPUT);
   // Set outputs to LOW
@@ -112,41 +112,48 @@ void loop() {
     toggleLED();
     response = "WiFi Connected: " + ip_address;
   }
-  
-  if(req.indexOf("onRed") != -1)
+
+  if(req.indexOf("forward") != -1)
+    {
+      response = "Forward Movement";
+      Serial2.write(0x01);
+      dx = 1;
+    }
+
+  if(req.indexOf("reverse") != -1)
+    {
+      toggleLED();
+      response = "Reverse Movement";
+      //Serial2.write(0x02);
+      dx = 2;
+      Serial2.write(dx);
+    }
+
+  if(req.indexOf("left") != -1)
   {
     toggleLED();
-    response = "RED LED ON";
-    Serial2.write(0x01);
-    dx = 1;
-    
-  }
-  
-  if(req.indexOf("onGreen") != -1)
-  {
-    toggleLED();
-    response = "GREEN LED ON";
-    Serial2.write(0x02);
-    dx = 2;
-  }
-  
-  if(req.indexOf("onBlue") != -1)
-  {
-    toggleLED();
-    response = "BLUE LED ON";
+    response = "Left Movement";
     Serial2.write(0x03);
     dx = 3;
   }
   
-    if(req.indexOf("offLED") != -1)
+  if(req.indexOf("right") != -1)
   {
     toggleLED();
-    response = "LED OFF";
+    response = "Right Movement";
+    Serial2.write(0x04);
+    dx = 4;
+  }
+  
+  if(req.indexOf("stop") != -1)
+  {
+    toggleLED();
+    response = "Stop Movement";
     Serial2.write(0x0);
     dx = 0;
   }
 
-  Serial2.write(dx);
+  //Serial2.write(dx);
   
   /*
        if (req.indexOf("on12") != -1) {digitalWrite(LED12, HIGH); estado = "LED12 ON";}
