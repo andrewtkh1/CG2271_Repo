@@ -188,49 +188,72 @@ void stopBot(){
 	TPM1_C0V = 0;
 	TPM1_C1V = 0;
 }
+// 0xEA6 = 50% duty cycle.
 
 void forward(){
- 	TPM2_C0V = 0x0EA6; 	//Bot left Forward
+ 	TPM2_C0V = 7500; 	//Bot left Forward
 	TPM2_C1V = 0; 			//Bot left Reverse
-	TPM0_C2V = 0x0EA6;	//Top left Forward
+	TPM0_C2V = 7500;	//Top left Forward
 	TPM0_C3V = 0;				//Top left Reverse
-	TPM0_C4V = 0x0EA6;	//Top right Forward
+	TPM0_C4V = 7500;	//Top right Forward
 	TPM0_C5V = 0;				//Top right Reverse
-	TPM1_C0V = 0x0EA6;	//Bot right Forward
+	TPM1_C0V = 7500;	//Bot right Forward
 	TPM1_C1V = 0;				//Bot right Reverse
 }
 
 void reverse(){
 	TPM2_C0V = 0; 			//Bot left Forward
-	TPM2_C1V = 0x0EA6; 	//Bot left Reverse
+	TPM2_C1V = 7500; 	//Bot left Reverse
 	TPM0_C2V = 0;				//Top left Forward
-	TPM0_C3V = 0x0EA6;	//Top left Reverse
+	TPM0_C3V = 7500;	//Top left Reverse
 	TPM0_C4V = 0;				//Top right Forward
-	TPM0_C5V = 0x0EA6;	//Top right Reverse
+	TPM0_C5V = 7500;	//Top right Reverse
 	TPM1_C0V = 0;				//Bot right Forward
-	TPM1_C1V = 0x0EA6;	//Bot right Reverse
+	TPM1_C1V = 7500;	//Bot right Reverse
 }
 
 void turnRight(){
-	TPM2_C0V = 0x0EA6; 	//Bot left Forward
+	TPM2_C0V = 7500/2; 	//Bot left Forward
 	TPM2_C1V = 0;				//Bot left Reverse
-	TPM0_C2V = 0x0EA6;	//Top left Forward
+	TPM0_C2V = 7500/2;	//Top left Forward
 	TPM0_C3V = 0;				//Top left Reverse
 	TPM0_C4V = 0;				//Top right Forward
-	TPM0_C5V = 0x0EA6;	//Top right Reverse
+	TPM0_C5V = 7500/2;	//Top right Reverse
 	TPM1_C0V = 0;				//Bot right Forward
-	TPM1_C1V = 0x0EA6;	//Bot right Reverse
+	TPM1_C1V = 7500/2;	//Bot right Reverse
 }
 
 void turnLeft(){
 	TPM2_C0V = 0; 			//Bot left Forward
-	TPM2_C1V = 0x0EA6; 	//Bot left Reverse
+	TPM2_C1V = 7500/2; 	//Bot left Reverse
 	TPM0_C2V = 0;				//Top left Forward
-	TPM0_C3V = 0x0EA6;	//Top left Reverse
-	TPM0_C4V = 0x0EA6;	//Top right Forward
+	TPM0_C3V = 7500/2;	//Top left Reverse
+	TPM0_C4V = 7500/2;	//Top right Forward
 	TPM0_C5V = 0;				//Top right Reverse
-	TPM1_C0V = 0x0EA6;	//Bot right Forward
+	TPM1_C0V = 7500/2;	//Bot right Forward
 	TPM1_C1V = 0;				//Bot right Reverse
+}
+
+void forwardRight(){
+ 	TPM2_C0V = 7500; 	//Bot left Forward
+	TPM2_C1V = 0; 			//Bot left Reverse
+	TPM0_C2V = 7500;	//Top left Forward
+	TPM0_C3V = 0;				//Top left Reverse
+	TPM0_C4V = 7500/10;//Top right Forward
+	TPM0_C5V = 0;				//Top right Reverse
+	TPM1_C0V = 7500/10;//Bot right Forward
+	TPM1_C1V = 0;				//Bot right Reverse
+}
+
+void forwardLeft(){
+	TPM2_C0V = 7500/10; 	//Bot left Forward
+	TPM2_C1V = 0; 				//Bot left Reverse
+	TPM0_C2V = 7500/10;	//Top left Forward
+	TPM0_C3V = 0;					//Top left Reverse
+	TPM0_C4V = 7500;		//Top right Forward
+	TPM0_C5V = 0;					//Top right Reverse
+	TPM1_C0V = 7500;		//Bot right Forward
+	TPM1_C1V = 0;					//Bot right Reverse
 }
 
 //UART2 ISR
@@ -280,7 +303,12 @@ void movement (void *argument) {
 			turnRight();
 			//osDelay(1000);
 			//rx_data = 0;
-		} else {
+		} else if (rx_data == 0x5) {
+			forwardRight();
+		} else if (rx_data == 0x6) {
+			forwardLeft();
+		}
+		else {
 			stopBot();
 		}
 	}

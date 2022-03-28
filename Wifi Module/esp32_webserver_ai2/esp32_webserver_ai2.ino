@@ -142,15 +142,29 @@ void loop() {
   {
     toggleLED();
     response = "Right Movement";
-    Serial2.write(4);
+    Serial2.write(0x04);
     dx = 4;
+  }
+  
+  if(req.indexOf("fwdleft") != -1)
+  {
+    toggleLED();
+    response = "Forward left";
+    Serial2.write(0x06);
+  }
+  
+    if(req.indexOf("fwdright") != -1)
+  {
+    toggleLED();
+    response = "Forward right";
+    Serial2.write(0x05);
   }
   
   if(req.indexOf("stop") != -1)
   {
     toggleLED();
     response = "Stop Movement";
-    Serial2.write(0b0);
+    Serial2.write(0x0);
     dx = 0;
   }
 
