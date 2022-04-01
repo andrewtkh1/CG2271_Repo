@@ -164,15 +164,15 @@ int melody[] = {
 void initPWM()
 {
 	//enable clock for port B
-	SIM_SCGC5 |= SIM_SCGC5_PORTB_MASK;
+	SIM_SCGC5 |= SIM_SCGC5_PORTE_MASK;
 	
 	//enable pin output and set mux TO 3 to use alt 3 for time in port b 01 n 1
-	PORTB->PCR[PTB0_Pin] &= ~PORT_PCR_MUX_MASK;
-	PORTB->PCR[PTB0_Pin] |= PORT_PCR_MUX(3);
+	PORTE->PCR[BUZZER] &= ~PORT_PCR_MUX_MASK;
+	PORTE->PCR[BUZZER] |= PORT_PCR_MUX(3);
 
 	
 	//enable clock gating for timer module
-	SIM->SCGC6 |= SIM_SCGC6_TPM1_MASK;
+	SIM->SCGC6 |= SIM_SCGC6_TPM0_MASK;
 	
 	//Select clock used
 	SIM->SOPT2 &= ~SIM_SOPT2_TPMSRC_MASK;
@@ -182,15 +182,15 @@ void initPWM()
 	
 	// edge aligned pwm
 	//ps: 111(128) and CMOD=01
-	TPM1->SC &= ~((TPM_SC_CMOD_MASK | (TPM_SC_PS_MASK)));
-	TPM1->SC |= (TPM_SC_CMOD(1) | (TPM_SC_PS(7)));
+	TPM0->SC &= ~((TPM_SC_CMOD_MASK | (TPM_SC_PS_MASK)));
+	TPM0->SC |= (TPM_SC_CMOD(1) | (TPM_SC_PS(7)));
 	// set to up counting
-	TPM1->SC &= ~(TPM_SC_CPWMS_MASK);
+	TPM0->SC &= ~(TPM_SC_CPWMS_MASK);
 	
 	// Enable PWM on TPM1 channe; 0 -> PTB0
 	//start from high output first 
-	TPM1_C0SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK) );
-  TPM1_C0SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
+	TPM0_C4SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK) );
+  TPM0_C4SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
 
 }
 
@@ -203,20 +203,20 @@ void setFreq(int freq)
 {
 	if(freq == 0)
 	{
-		TPM1_C0V = (unsigned int) 0;
+		TPM0_C4V = (unsigned int) 0;
 		return;
 	}
 	int newMod = 375000.0 / freq;
 	
 	// Update TPM0's MOD
-	TPM1->MOD = (unsigned int) newMod;
+	TPM0->MOD = (unsigned int) newMod;
 
 	// Update C0V for the buzzer
-	TPM1_C0V = (unsigned int) (newMod * 0.5);
+	TPM0_C4V = (unsigned int) (newMod * 0.5);
 }
 
 int isPlaying() {
-	return (TPM1_C0V == (unsigned int) 0);
+	return (TPM0_C4V == (unsigned int) 0);
 }
 
 
@@ -277,4 +277,3 @@ int main (void) {
 	
  
   
-
