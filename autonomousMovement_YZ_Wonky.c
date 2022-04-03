@@ -26,7 +26,11 @@ osSemaphoreId_t autoSelect;
 #define MASK(x) (1 << (x)) 
 
 volatile int front_Sensor_Trigger = -1;
+volatile int portA_Handler_Counter = -1;
 volatile int back_Sensor_Trigger = 0;
+volatile int portD_Handler_Counter = -1;
+
+volatile int triggered = 0;
 
 void PORTA_IRQHandler() {
 
@@ -37,9 +41,11 @@ void PORTA_IRQHandler() {
 		// Set the flag for Front IR trigger
 		front_Sensor_Trigger += 1;
 	}
+	//portA_Handler_Counter += 1;
 	
 	PORTA->ISFR |= MASK(IR_SENSOR_1);
-	NVIC_DisableIRQ(PORTA_IRQn);
+	//Counter to disable IRQ.
+	
 }
 
 void PORTD_IRQHandler() {
@@ -49,6 +55,11 @@ void PORTD_IRQHandler() {
 		back_Sensor_Trigger = 1;
 	}
 	PORTD->ISFR |= MASK(IR_SENSOR_2);
+	//Counter to disable IRQ
+	portD_Handler_Counter += 1;
+	if(portD_Handler_Counter > 1) {
+		NVIC_DisableIRQ(PORTD_IRQn);
+	}
 }
 
 void initIRSensor(void)
@@ -168,20 +179,6 @@ static void delay(volatile uint32_t nof) {
     nof--;
   }
 }
-/*----------------------------------------------------------------------------
- * Application main thread
- *---------------------------------------------------------------------------*/
-
-/*
-* 				TPM2_C0V = Bot left Forward
-					TPM2_C1V = Bot left Reverse
-					TPM0_C2V = Top left Forward
-					TPM0_C3V = Top left Reverse
-					TPM0_C4V = Top right Forward
-					TPM0_C5V = Top right Reverse
-					TPM1_C0V = Bot right Forward
-					TPM1_C1V = Bot right Reverse
-*/
 
 void stopBot(){
 	TPM2_C0V = 0;
@@ -272,30 +269,70 @@ void movement (void *argument) {
 }
 
 void autonomousMovement(void *argument) {
-	osSemaphoreAcquire(autoSelect, osWaitForever);
+	//osSemaphoreAcquire(autoSelect, osWaitForever);
 	initIRSensor();
 	NVIC_EnableIRQ(PORTA_IRQn);
 	for(;;) {
 		//Move forward for a certain distance until Front_IR Triggers
-		forward();
-		if(front_Sensor_Trigger >= 1) {
+		osDelay(400);
+	//	forward();
+	//	if(front_Sensor_Trigger == 1) {
 		// When IR_Sensor goes Low.
 			//NVIC_DisableIRQ(PORTA_IRQn);
-			stopBot();
-			//turnLeft();
-			//osDelay(1000);
-			stopBot();
-			while(1){};
-			//front_Sensor_Trigger = 0;
-		}
-		if(back_Sensor_Trigger == 1) {
-				// Whne Back IR_Sensor goes Low
-				stopBot();
+			//triggered+=1;
+			//if(portA_Handler_Counter >= 1) {
+			//	osDelay(400);
+			//  stopBot();
+				osDelay(400);
+				turnLeft();
+				osDelay(1000);
+			  forward();
+			  osDelay(1000);
+			  turnRight();
+				osDelay(1000);
+			  forward();
+				osDelay(2000);
+			  turnRight();
+				osDelay(1000);
+			  forward();
+				osDelay(2000);
+			  turnRight();
+				osDelay(1000);
+				forward();
+				osDelay(1000);
 				turnRight();
 				osDelay(1000);
+				forward();
+				osDelay(500);
+				turnLeft();
+				osDelay(1000);
+				forward();
+				front_Sensor_Trigger = 2;
+				NVIC_EnableIRQ(PORTA_IRQn);
+	//		}
+		
+	//		if(front_Sensor_Trigger == 3) {
+	//			osDelay(400);
+	//			stopBot();
+	//		}
+				//NVIC_DisableIRQ(PORTA_IRQn);
+			//}
+			//osDelay(400);
+			//stopBot();
+			//turnLeft();
+			//osDelay(10000);
+			//front_Sensor_Trigger = 0;
+			//front_Sensor_Trigger = 0;
+		//}
+		
+		/*if(back_Sensor_Trigger >= 1) {
+				// Whne Back IR_Sensor goes Low
 				stopBot();
+				//turnRight();
+				osDelay(1000);
+				//stopBot();
 				back_Sensor_Trigger = 0;
-			}
+			}*/
 		//Stop Button for E-Stop
 		/*if (rx_data == 0x0b) {
 			stopBot();
