@@ -135,37 +135,37 @@
 
 int tetris_melody[] = {
 
-  //Based on the arrangement at https://www.flutetunes.com/tunes.php?id=192
+	//Based on the arrangement at https://www.flutetunes.com/tunes.php?id=192
   
-  NOTE_E5, 4,  NOTE_B4,8,  NOTE_C5,8,  NOTE_D5,4,  NOTE_C5,8,  NOTE_B4,8,
-  NOTE_A4, 4,  NOTE_A4,8,  NOTE_C5,8,  NOTE_E5,4,  NOTE_D5,8,  NOTE_C5,8,
-  NOTE_B4, -4,  NOTE_C5,8,  NOTE_D5,4,  NOTE_E5,4,
-  NOTE_C5, 4,  NOTE_A4,4,  NOTE_A4,8,  NOTE_A4,4,  NOTE_B4,8,  NOTE_C5,8,
+	NOTE_E5, 4,  NOTE_B4,8,  NOTE_C5,8,  NOTE_D5,4,  NOTE_C5,8,  NOTE_B4,8,
+	NOTE_A4, 4,  NOTE_A4,8,  NOTE_C5,8,  NOTE_E5,4,  NOTE_D5,8,  NOTE_C5,8,
+	NOTE_B4, -4,  NOTE_C5,8,  NOTE_D5,4,  NOTE_E5,4,
+	NOTE_C5, 4,  NOTE_A4,4,  NOTE_A4,8,  NOTE_A4,4,  NOTE_B4,8,  NOTE_C5,8,
 
-  NOTE_D5, -4,  NOTE_F5,8,  NOTE_A5,4,  NOTE_G5,8,  NOTE_F5,8,
-  NOTE_E5, -4,  NOTE_C5,8,  NOTE_E5,4,  NOTE_D5,8,  NOTE_C5,8,
-  NOTE_B4, 4,  NOTE_B4,8,  NOTE_C5,8,  NOTE_D5,4,  NOTE_E5,4,
-  NOTE_C5, 4,  NOTE_A4,4,  NOTE_A4,4, REST, 4,
+	NOTE_D5, -4,  NOTE_F5,8,  NOTE_A5,4,  NOTE_G5,8,  NOTE_F5,8,
+	NOTE_E5, -4,  NOTE_C5,8,  NOTE_E5,4,  NOTE_D5,8,  NOTE_C5,8,
+	NOTE_B4, 4,  NOTE_B4,8,  NOTE_C5,8,  NOTE_D5,4,  NOTE_E5,4,
+	NOTE_C5, 4,  NOTE_A4,4,  NOTE_A4,4, REST, 4,
 
-  NOTE_E5, 4,  NOTE_B4,8,  NOTE_C5,8,  NOTE_D5,4,  NOTE_C5,8,  NOTE_B4,8,
-  NOTE_A4, 4,  NOTE_A4,8,  NOTE_C5,8,  NOTE_E5,4,  NOTE_D5,8,  NOTE_C5,8,
-  NOTE_B4, -4,  NOTE_C5,8,  NOTE_D5,4,  NOTE_E5,4,
-  NOTE_C5, 4,  NOTE_A4,4,  NOTE_A4,8,  NOTE_A4,4,  NOTE_B4,8,  NOTE_C5,8,
+	NOTE_E5, 4,  NOTE_B4,8,  NOTE_C5,8,  NOTE_D5,4,  NOTE_C5,8,  NOTE_B4,8,
+	NOTE_A4, 4,  NOTE_A4,8,  NOTE_C5,8,  NOTE_E5,4,  NOTE_D5,8,  NOTE_C5,8,
+	NOTE_B4, -4,  NOTE_C5,8,  NOTE_D5,4,  NOTE_E5,4,
+	NOTE_C5, 4,  NOTE_A4,4,  NOTE_A4,8,  NOTE_A4,4,  NOTE_B4,8,  NOTE_C5,8,
 
-  NOTE_D5, -4,  NOTE_F5,8,  NOTE_A5,4,  NOTE_G5,8,  NOTE_F5,8,
-  NOTE_E5, -4,  NOTE_C5,8,  NOTE_E5,4,  NOTE_D5,8,  NOTE_C5,8,
-  NOTE_B4, 4,  NOTE_B4,8,  NOTE_C5,8,  NOTE_D5,4,  NOTE_E5,4,
-  NOTE_C5, 4,  NOTE_A4,4,  NOTE_A4,4, REST, 4,
+	NOTE_D5, -4,  NOTE_F5,8,  NOTE_A5,4,  NOTE_G5,8,  NOTE_F5,8,
+	NOTE_E5, -4,  NOTE_C5,8,  NOTE_E5,4,  NOTE_D5,8,  NOTE_C5,8,
+	NOTE_B4, 4,  NOTE_B4,8,  NOTE_C5,8,  NOTE_D5,4,  NOTE_E5,4,
+	NOTE_C5, 4,  NOTE_A4,4,  NOTE_A4,4, REST, 4,
   
 
-  NOTE_E5,2,  NOTE_C5,2,
-  NOTE_D5,2,   NOTE_B4,2,
-  NOTE_C5,2,   NOTE_A4,2,
-  NOTE_GS4,2,  NOTE_B4,4,  REST,8, 
-  NOTE_E5,2,   NOTE_C5,2,
-  NOTE_D5,2,   NOTE_B4,2,
-  NOTE_C5,4,   NOTE_E5,4,  NOTE_A5,2,
-  NOTE_GS5,2,
+	NOTE_E5,2,  NOTE_C5,2,
+	NOTE_D5,2,   NOTE_B4,2,
+	NOTE_C5,2,   NOTE_A4,2,
+	NOTE_GS4,2,  NOTE_B4,4,  REST,8, 
+	NOTE_E5,2,   NOTE_C5,2,
+	NOTE_D5,2,   NOTE_B4,2,
+	NOTE_C5,4,   NOTE_E5,4,  NOTE_A5,2,
+	NOTE_GS5,2,
 
 };
 
@@ -238,37 +238,36 @@ void thread_buzzer (void *argument) {
 	for (;;) {
 		int wholenote = (60000 * 4) / tempo_tetris;
 		for (int thisNote = 0; thisNote < notes * 2; thisNote = thisNote + 2) {
-
 			// calculates the duration of each note
-    divider = tetris_melody[thisNote + 1];
-    if (divider > 0) {
-      // regular note, just proceed
-      noteDuration = (wholenote) / divider;
-    } else if (divider < 0) {
-      // dotted notes are represented with negative durations!!
-      noteDuration = (wholenote) / (divider*-1);
-      noteDuration *= 1.5; // increases the duration in half for dotted notes
-    }
+			divider = tetris_melody[thisNote + 1];
+			if (divider > 0) {
+			// regular note, just proceed
+			noteDuration = (wholenote) / divider;
+			} else if (divider < 0) {
+			// dotted notes are represented with negative durations!!
+			noteDuration = (wholenote) / (divider*-1);
+			noteDuration *= 1.5; // increases the duration in half for dotted notes
+			}
 
-    // we only play the note for 90% of the duration, leaving 10% as a pause
-		setFreq( tetris_melody[thisNote]);
-		osDelay(noteDuration * 0.9);
+			// we only play the note for 90% of the duration, leaving 10% as a pause
+			setFreq( tetris_melody[thisNote]);
+			osDelay(noteDuration * 0.9);
 
-    // Wait for the specief duration before playing the next note.
-    osDelay(noteDuration);
+			// Wait for the specief duration before playing the next note.
+			osDelay(noteDuration);
 
-    // stop the waveform generation before the next note.
-    setFreq(0);
-		osDelay(10);
-	}		
- }
+			// stop the waveform generation before the next note.
+			setFreq(0);
+			osDelay(10);
+		}		
+	}
 }
 
 
 int main (void) {
  
   // System Initialization
-  SystemCoreClockUpdate();
+	SystemCoreClockUpdate();
 	initPWM();
 	//initGreenStrip();
 	osThreadNew(thread_buzzer, NULL, NULL);
