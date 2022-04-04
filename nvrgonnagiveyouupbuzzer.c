@@ -221,9 +221,7 @@ int isPlaying() {
 
 
 
-void thread_buzzer (void *argument) {
-	
-	
+void thread_buzzer (void *argument) {	
 	for (;;) {
 		int wholenote = (60000 * 4) / tempo;
 		for (int thisNote = 0; thisNote < notes * 2; thisNote = thisNote + 2) {

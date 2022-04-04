@@ -6,7 +6,7 @@
 
 // Replace with your network credentials
 const char* ssid = "Gdrew";
-const char* password = "ntag0918";
+const char* password = "ntag0919";
 
 // Set web server port number to 80
 WiFiServer server(80);
@@ -168,19 +168,31 @@ void loop() {
     dx = 0;
   }
 
-  //Serial2.write(dx);
+   if(req.indexOf("auto") != -1)
+  {
+    toggleLED();
+    response = "AUTO MODE. DONT TOUCH!!";
+    Serial2.write(0x07);
+    dx = 0;
+  }
+
+  if(req.indexOf("musicStart") != -1)
+  {
+    toggleLED();
+    response = "START Music";
+    Serial2.write(0x08);
+    dx = 0;
+  }
+
+  if(req.indexOf("musicStop") != -1)
+  {
+    toggleLED();
+    response = "STOP music";
+    Serial2.write(0x09);
+    dx = 0;
+  }
   
-  /*
-       if (req.indexOf("on12") != -1) {digitalWrite(LED12, HIGH); estado = "LED12 ON";}
-       if (req.indexOf("off12") != -1){digitalWrite(LED12, LOW); estado = "LED12 OFF";}
-       if (req.indexOf("on14") != -1) {digitalWrite(LED14, HIGH); estado = "LED14 ON";}
-       if (req.indexOf("off14") != -1){digitalWrite(LED14, LOW); estado = "LED14 OFF";}
-       if (req.indexOf("consulta") != -1){
-           estado ="";
-           if (digitalRead(LED12) == HIGH) {estado = "LED12 ON,";} else {estado = "LED12 OFF,";}
-           if (digitalRead(LED14) == HIGH) {estado = estado + "LED14 ON";} else {estado = estado + "LED14 OFF";}
-           }*/
-           
+
 
   client.println("HTTP/1.1 200 OK");
   client.println("Content-Type: text/html");
