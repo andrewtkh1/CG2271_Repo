@@ -11,27 +11,136 @@
 //Semaphore Global ID
 osSemaphoreId_t autoSelect;
 //Variables for interrupt IR sensor
-#define IR_SENSOR_1	13 //PortA 13
-#define IR_SENSOR_2 5	//PortD 5
+//#define IR_SENSOR_1	13 //PortA 13
+//#define IR_SENSOR_2 5	//PortD 5
+#define TRIGGER 12 // PORTC PIN 12 Ultrasonic Trigger
+#define ECHO 13 // PORTC PIN 13 Ultrasonic Trigger
 #define PORTA_INT_PRIO 1
 
 #define TOP_LEFT_WHEEL_FWD	30 					// PORT E pin 30 TM0 CH2 FWD
 #define TOP_LEFT_WHEEL_REV	29 					// PORT E pin 29 TM0 CH3 REV
-#define BOT_LEFT_WHEEL_FWD 22 					// Tmp2 Ch0 Forward
-#define BOT_LEFT_WHEEL_REV 2						// Tpm2 Ch1 Reverse
+#define BOT_LEFT_WHEEL_FWD 1 						// PORT C 1 Tmp0 Ch0 Forward *CHanged
+#define BOT_LEFT_WHEEL_REV 1						// PORT D 1 Tpm0 Ch1 Reverse *CHanged
 #define TOP_RIGHT_WHEEL_FWD 8 					// Tpm0 CHANNEL 4 FWD
 #define TOP_RIGHT_WHEEL_REV 9 					// Tpm0 CHANNEL 5 REV
 #define BOT_RIGHT_WHEEL_REV 21					// TPM1 Ch1 REV
 #define BOT_RIGHT_WHEEL_FWD 20					// Tpm1 Ch0 FWD
+#define GREEN_1  7// port C pin 7
+#define GREEN_LED 7 // PORT D Pin 7
 #define MASK(x) (1 << (x)) 
 
 volatile int front_Sensor_Trigger = -1;
-volatile int portA_Handler_Counter = -1;
+//volatile int portA_Handler_Counter = -1;
 volatile int back_Sensor_Trigger = 0;
-volatile int portD_Handler_Counter = -1;
+//volatile int portD_Handler_Counter = -1;
+//1 means the robot has went round the obstacle.
+volatile int went_round_obstacle = 0;
+
+int volatile counter;
+int volatile wait_delay;
+int volatile duration = 10000;
+int volatile isdetect;
+
 
 volatile int triggered = 0;
 
+void initGreenPin (){
+	//SIM->SCGC5 |= SIM_SCGC5_PORTD_MASK;
+	PORTD->PCR[GREEN_LED] &= ~PORT_PCR_MUX_MASK;
+	PORTD->PCR[GREEN_LED] |= PORT_PCR_MUX(1);
+	PTD->PDDR |= MASK(GREEN_LED);
+}
+
+
+void initGreenStrip(void ) {
+	//SIM->SCGC5 |= (SIM_SCGC5_PORTC_MASK);
+	
+	PORTC->PCR[GREEN_1] &= ~PORT_PCR_MUX_MASK;
+	PORTC->PCR[GREEN_1] |= PORT_PCR_MUX(1);
+	
+	// set as output
+	PTC->PDDR |= MASK(GREEN_1) ;
+
+}
+
+
+//The PIT Interrupt for Ultrasonic sensor
+void init_pit(){
+	SIM->SCGC5 |= SIM_SCGC5_PORTC_MASK;
+	PORTC->PCR[TRIGGER] &= ~PORT_PCR_MUX_MASK;
+	PORTC->PCR[TRIGGER] |= PORT_PCR_MUX(1);
+	PORTC->PCR[ECHO] &= ~PORT_PCR_MUX_MASK;
+	PORTC->PCR[ECHO] |= PORT_PCR_MUX(1);
+	
+	PTC->PDDR |= MASK(TRIGGER);
+	PTC->PDDR &= ~MASK(ECHO);
+	
+	
+	SIM->SCGC6 |= SIM_SCGC6_PIT_MASK;
+	PIT->MCR = 0;
+	
+	PIT->CHANNEL[0].LDVAL = 47;
+	PIT->CHANNEL[0].TCTRL |= PIT_TCTRL_TIE_MASK | PIT_TCTRL_TEN_MASK;
+	
+	NVIC_SetPriority(PIT_IRQn,2);
+	NVIC_ClearPendingIRQ(PIT_IRQn);
+	NVIC_EnableIRQ(PIT_IRQn);
+}
+
+void PIT_IRQHandler(){
+	if(PIT->CHANNEL[0].TFLG & PIT_TFLG_TIF_MASK){
+		PIT->CHANNEL[0].TFLG &= PIT_TFLG_TIF_MASK;
+		counter--;
+		if(counter == 0){
+			PIT->CHANNEL[0].TCTRL &= ~PIT_TCTRL_TEN_MASK;
+			wait_delay = 0;
+		}
+	}
+}
+
+int detect(void){
+	PTC->PDOR &= ~MASK(TRIGGER);
+	wait_delay = 1;
+	counter = 2;
+	PIT->CHANNEL[0].TCTRL |= PIT_TCTRL_TEN_MASK;
+	while(wait_delay);
+	
+	PTC->PDOR |= MASK(TRIGGER);
+	wait_delay = 1;
+	counter = 10;
+	PIT->CHANNEL[0].TCTRL |= PIT_TCTRL_TEN_MASK;
+	while(wait_delay);
+	
+	PTC->PDOR &= ~MASK(TRIGGER);
+	
+	wait_delay = 1;
+	counter = 10000;
+	PIT->CHANNEL[0].TCTRL |= PIT_TCTRL_TEN_MASK;
+	
+	while ((PTC->PDIR & MASK(ECHO)) == 0){
+		if(!wait_delay){
+			duration = 200000;
+			return -1;
+		}
+	}
+	while ((PTC->PDIR & MASK(ECHO)) == MASK(ECHO)){
+		if(!wait_delay){
+			duration = 200000;
+			return -1;
+		}
+	}
+	
+	duration = 10000 - counter;
+	
+	//Change here
+	if(duration <=2000)
+		return 1;
+	else return 0;
+
+}
+
+
+/*
 void PORTA_IRQHandler() {
 
 	NVIC_ClearPendingIRQ(PORTA_IRQn);
@@ -43,9 +152,8 @@ void PORTA_IRQHandler() {
 	}
 	//portA_Handler_Counter += 1;
 	
-	PORTA->ISFR |= MASK(IR_SENSOR_1);
 	//Counter to disable IRQ.
-	
+	PORTA->ISFR |= MASK(IR_SENSOR_1);
 }
 
 void PORTD_IRQHandler() {
@@ -79,19 +187,22 @@ void initIRSensor(void)
 	PTA->PDDR &= ~MASK(IR_SENSOR_1);
 	PTD->PDDR &= ~MASK(IR_SENSOR_2);
 	//Enable Interrupts
-	NVIC_SetPriority(PORTA_IRQn, 1);
+	NVIC_SetPriority(PORTA_IRQn, 0);
 	NVIC_ClearPendingIRQ(PORTA_IRQn);
 	NVIC_EnableIRQ(PORTA_IRQn);
-	NVIC_SetPriority(PORTD_IRQn, 1);
+	NVIC_SetPriority(PORTD_IRQn, 0);
 	NVIC_ClearPendingIRQ(PORTD_IRQn);
+	PORTA->ISFR |= MASK(IR_SENSOR_1);
 	//NVIC_EnableIRQ(PORTD_IRQn);
 }
+*/
 
 void initPWM(){
+	SIM->SCGC5 |= SIM_SCGC5_PORTA_MASK;
+	SIM->SCGC5 |= SIM_SCGC5_PORTB_MASK;
 	SIM->SCGC5 |= SIM_SCGC5_PORTC_MASK;
-	SIM_SCGC5 |= SIM_SCGC5_PORTE_MASK;
-	SIM_SCGC5 |= SIM_SCGC5_PORTA_MASK;
-	SIM_SCGC6 |= SIM_SCGC6_TPM2_MASK;
+	SIM->SCGC5 |= SIM_SCGC5_PORTE_MASK;
+	SIM->SCGC5 |= SIM_SCGC5_PORTD_MASK;
 	SIM->SCGC6 |= SIM_SCGC6_TPM0_MASK;
 	SIM->SCGC6 |= SIM_SCGC6_TPM1_MASK;
 	
@@ -105,8 +216,8 @@ void initPWM(){
 	//Set the MUX portion of the PTC9 Pin register to be ALT 3 mode.
 	PORTC->PCR[TOP_RIGHT_WHEEL_REV] |= PORT_PCR_MUX(3);
 	
-	PORTE->PCR[BOT_LEFT_WHEEL_FWD] &= ~PORT_PCR_MUX_MASK;
-	PORTE->PCR[BOT_LEFT_WHEEL_FWD] |= PORT_PCR_MUX(3);
+	PORTC->PCR[BOT_LEFT_WHEEL_FWD] &= ~PORT_PCR_MUX_MASK;
+	PORTC->PCR[BOT_LEFT_WHEEL_FWD] |= PORT_PCR_MUX(4);
 	
 	PORTE->PCR[BOT_RIGHT_WHEEL_REV] &= ~PORT_PCR_MUX_MASK;	//Clearing the bits of Port E to 0
 	PORTE->PCR[BOT_RIGHT_WHEEL_REV] |= PORT_PCR_MUX(3);		//Setting it to be PWM. 3 = PWM.
@@ -114,8 +225,8 @@ void initPWM(){
 	PORTE->PCR[BOT_RIGHT_WHEEL_FWD] &= ~PORT_PCR_MUX_MASK;
 	PORTE->PCR[BOT_RIGHT_WHEEL_FWD] |= PORT_PCR_MUX(3);
 	
-	PORTA->PCR[BOT_LEFT_WHEEL_REV] &= ~PORT_PCR_MUX_MASK;
-	PORTA->PCR[BOT_LEFT_WHEEL_REV] |= PORT_PCR_MUX(3);
+	PORTD->PCR[BOT_LEFT_WHEEL_REV] &= ~PORT_PCR_MUX_MASK;
+	PORTD->PCR[BOT_LEFT_WHEEL_REV] |= PORT_PCR_MUX(4);
 	//enable pin output and set mux TO 3 to use alt 3 for time in port b 01 n 1
 	PORTE->PCR[TOP_LEFT_WHEEL_FWD] &= ~PORT_PCR_MUX_MASK;
 	PORTE->PCR[TOP_LEFT_WHEEL_FWD] |= PORT_PCR_MUX(3);
@@ -133,10 +244,6 @@ void initPWM(){
 	// set to up counting
 	TPM0->SC &= ~(TPM_SC_CPWMS_MASK);
 	
-	TPM2->SC &= ~(TPM_SC_CMOD_MASK | TPM_SC_PS_MASK);
-	TPM2->SC |= (TPM_SC_CMOD(1) | TPM_SC_PS(7));
-	TPM2->SC &= ~TPM_SC_CPWMS_MASK;
-	
 	TPM1->SC &= ~((TPM_SC_CMOD_MASK) | (TPM_SC_PS_MASK)); //CMOD = clock mode selection, PS = Prescale Factor Selection
 	TPM1->SC |= ((TPM_SC_CMOD(1)) | (TPM_SC_PS(7)));	//PS = 128
 	TPM1->SC &= ~(TPM_SC_CPWMS_MASK);	//Set PWM to Up counting mode
@@ -144,17 +251,17 @@ void initPWM(){
 	// Enable PWM on TPM1 channel 2; 0 -> PTB0
 	//start from high output first 
 	TPM0_C2SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK) );
-  	TPM0_C2SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
+  TPM0_C2SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
 	
 	// Enable PWM on TPM1 channel 3; 0 -> PTB1
 	TPM0_C3SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK) );
-  	TPM0_C3SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
+  TPM0_C3SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
 	
-	TPM2_C0SC &= ~(TPM_CnSC_ELSA_MASK | TPM_CnSC_ELSB_MASK | TPM_CnSC_MSA_MASK | TPM_CnSC_MSB_MASK);
-	TPM2_C0SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
+	TPM0_C0SC &= ~(TPM_CnSC_ELSA_MASK | TPM_CnSC_ELSB_MASK | TPM_CnSC_MSA_MASK | TPM_CnSC_MSB_MASK);
+	TPM0_C0SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
 	
-	TPM2_C1SC &= ~(TPM_CnSC_ELSA_MASK | TPM_CnSC_ELSB_MASK | TPM_CnSC_MSA_MASK | TPM_CnSC_MSB_MASK);
-	TPM2_C1SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
+	TPM0_C1SC &= ~(TPM_CnSC_ELSA_MASK | TPM_CnSC_ELSB_MASK | TPM_CnSC_MSA_MASK | TPM_CnSC_MSB_MASK);
+	TPM0_C1SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
 	
 	//Set the counter to run as low true Pass for TPM0 Ch 4 & Ch 5
 	TPM0_C4SC &= ~((TPM_CnSC_ELSB_MASK | (TPM_CnSC_ELSA_MASK) |(TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK)));
@@ -168,11 +275,109 @@ void initPWM(){
 	TPM1_C1SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
 	TPM1_C1SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));	//Setting whether its count up/down. MSB = Select edge aligned.
 	
-	TPM2->MOD = 7500;
+	TPM1->MOD = 7500;
+	TPM0->MOD = 7500;
+	
+	TPM0_C0V = 0;
+	TPM0_C1V = 0;
+	
+	TPM0_C2V = 0;
+	TPM0_C3V = 0;
+	
+	TPM0_C4V = 0;
+	TPM0_C5V = 0;
+	
+	TPM1_C0V = 0;
+	TPM1_C1V = 0;
+}
+
+
+
+/*
+void initPWM(){
+	SIM_SCGC5 |= SIM_SCGC5_PORTE_MASK;
+	SIM_SCGC5 |= SIM_SCGC5_PORTA_MASK;
+	SIM->SCGC6 |= SIM_SCGC6_TPM0_MASK;
+	SIM->SCGC6 |= SIM_SCGC6_TPM1_MASK;
+	//Changes made due to andrew pin update//
+	SIM->SCGC5 |= SIM_SCGC5_PORTC_MASK;
+	SIM->SCGC5 |= SIM_SCGC5_PORTD_MASK;
+  //
+	
+	//Zero out the entire register for PTC8 Pin
+	PORTC->PCR[TOP_RIGHT_WHEEL_FWD] &= ~PORT_PCR_MUX_MASK;
+	//Set the MUX portion of the PTC8 Pin register to be ALT 3 mode.
+	PORTC->PCR[TOP_RIGHT_WHEEL_FWD] |= PORT_PCR_MUX(3);
+	
+	//Zero out the entire register for PTC9 Pin
+	PORTC->PCR[TOP_RIGHT_WHEEL_REV] &= ~PORT_PCR_MUX_MASK;
+	//Set the MUX portion of the PTC9 Pin register to be ALT 3 mode.
+	PORTC->PCR[TOP_RIGHT_WHEEL_REV] |= PORT_PCR_MUX(3);
+	
+	PORTC->PCR[BOT_LEFT_WHEEL_FWD] &= ~PORT_PCR_MUX_MASK;
+	PORTC->PCR[BOT_LEFT_WHEEL_FWD] |= PORT_PCR_MUX(4);
+	
+	PORTE->PCR[BOT_RIGHT_WHEEL_REV] &= ~PORT_PCR_MUX_MASK;	//Clearing the bits of Port E to 0
+	PORTE->PCR[BOT_RIGHT_WHEEL_REV] |= PORT_PCR_MUX(3);		//Setting it to be PWM. 3 = PWM.
+	
+	PORTE->PCR[BOT_RIGHT_WHEEL_FWD] &= ~PORT_PCR_MUX_MASK;
+	PORTE->PCR[BOT_RIGHT_WHEEL_FWD] |= PORT_PCR_MUX(3);
+	
+	PORTD->PCR[BOT_LEFT_WHEEL_REV] &= ~PORT_PCR_MUX_MASK;
+	PORTD->PCR[BOT_LEFT_WHEEL_REV] |= PORT_PCR_MUX(4);
+	
+	//enable pin output and set mux TO 3 to use alt 3 for time in port b 01 n 1
+	PORTE->PCR[TOP_LEFT_WHEEL_FWD] &= ~PORT_PCR_MUX_MASK;
+	PORTE->PCR[TOP_LEFT_WHEEL_FWD] |= PORT_PCR_MUX(3);
+	
+	PORTE->PCR[TOP_LEFT_WHEEL_REV] &= ~PORT_PCR_MUX_MASK;
+	PORTE->PCR[TOP_LEFT_WHEEL_REV] |= PORT_PCR_MUX(3);
+	
+	SIM->SOPT2 &= ~SIM_SOPT2_TPMSRC_MASK;
+	SIM->SOPT2 |= SIM_SOPT2_TPMSRC(1);
+	
+	// edge aligned pwm
+	//ps: 111(128) and CMOD=01
+	TPM0->SC &= ~((TPM_SC_CMOD_MASK | (TPM_SC_PS_MASK)));
+	TPM0->SC |= (TPM_SC_CMOD(1) | (TPM_SC_PS(7)));
+	// set to up counting
+	TPM0->SC &= ~(TPM_SC_CPWMS_MASK);
+		
+	TPM1->SC &= ~((TPM_SC_CMOD_MASK) | (TPM_SC_PS_MASK)); //CMOD = clock mode selection, PS = Prescale Factor Selection
+	TPM1->SC |= ((TPM_SC_CMOD(1)) | (TPM_SC_PS(7)));	//PS = 128
+	TPM1->SC &= ~(TPM_SC_CPWMS_MASK);	//Set PWM to Up counting mode
+	
+	// Enable PWM on TPM1 channel 2; 0 -> PTB0
+	//start from high output first 
+	TPM0_C2SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK) );
+  	TPM0_C2SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
+	
+	// Enable PWM on TPM1 channel 3; 0 -> PTB1
+	TPM0_C3SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK) );
+  	TPM0_C3SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
+	
+	TPM0_C0SC &= ~(TPM_CnSC_ELSA_MASK | TPM_CnSC_ELSB_MASK | TPM_CnSC_MSA_MASK | TPM_CnSC_MSB_MASK);
+	TPM0_C0SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
+	
+	TPM0_C1SC &= ~(TPM_CnSC_ELSA_MASK | TPM_CnSC_ELSB_MASK | TPM_CnSC_MSA_MASK | TPM_CnSC_MSB_MASK);
+	TPM0_C1SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
+	
+	//Set the counter to run as low true Pass for TPM0 Ch 4 & Ch 5
+	TPM0_C4SC &= ~((TPM_CnSC_ELSB_MASK | (TPM_CnSC_ELSA_MASK) |(TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK)));
+	TPM0_C4SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
+	TPM0_C5SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK) );
+	TPM0_C5SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
+	
+	//For Timer 1 Ch 0 & Ch 1
+	TPM1_C0SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
+	TPM1_C0SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));	//Setting whether its count up/down. MSB = Select edge aligned.
+	TPM1_C1SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
+	TPM1_C1SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));	//Setting whether its count up/down. MSB = Select edge aligned.
+	
 	TPM1->MOD = 7500;
 	TPM0->MOD = 7500;
 }
-
+*/
 static void delay(volatile uint32_t nof) {
   while(nof!=0) {
     __asm("NOP");
@@ -181,8 +386,8 @@ static void delay(volatile uint32_t nof) {
 }
 
 void stopBot(){
-	TPM2_C0V = 0;
-	TPM2_C1V = 0;
+	TPM0_C0V = 0;
+	TPM0_C1V = 0;
 	TPM0_C2V = 0;
 	TPM0_C3V = 0;
 	TPM0_C4V = 0;
@@ -193,19 +398,19 @@ void stopBot(){
 // 0xEA6 = 50% duty cycle.
 
 void forward(){
- 	TPM2_C0V = 7500; 	//Bot left Forward
-	TPM2_C1V = 0; 			//Bot left Reverse
-	TPM0_C2V = 7500;	//Top left Forward
+ 	TPM0_C0V = 15000; 	//Bot left Forward
+	TPM0_C1V = 0; 			//Bot left Reverse
+	TPM0_C2V = 15000;	//Top left Forward
 	TPM0_C3V = 0;				//Top left Reverse
-	TPM0_C4V = 7500;	//Top right Forward
+	TPM0_C4V = 15000;	//Top right Forward
 	TPM0_C5V = 0;				//Top right Reverse
-	TPM1_C0V = 7500;	//Bot right Forward
+	TPM1_C0V = 15000;	//Bot right Forward
 	TPM1_C1V = 0;				//Bot right Reverse
 }
 
 void reverse(){
-	TPM2_C0V = 0; 			//Bot left Forward
-	TPM2_C1V = 7500; 	//Bot left Reverse
+	TPM0_C0V = 0; 			//Bot left Forward
+	TPM0_C1V = 7500; 	//Bot left Reverse
 	TPM0_C2V = 0;				//Top left Forward
 	TPM0_C3V = 7500;	//Top left Reverse
 	TPM0_C4V = 0;				//Top right Forward
@@ -215,49 +420,48 @@ void reverse(){
 }
 
 void turnRight(){
-	TPM2_C0V = 7500/2; 	//Bot left Forward
-	TPM2_C1V = 0;				//Bot left Reverse
-	TPM0_C2V = 7500/2;	//Top left Forward
+	TPM0_C0V = 7500/1.8; 	//Bot left Forward
+	TPM0_C1V = 0;				//Bot left Reverse
+	TPM0_C2V = 7500/1.8;	//Top left Forward
 	TPM0_C3V = 0;				//Top left Reverse
 	TPM0_C4V = 0;				//Top right Forward
-	TPM0_C5V = 7500/2;	//Top right Reverse
+	TPM0_C5V = 7500/1.8;	//Top right Reverse
 	TPM1_C0V = 0;				//Bot right Forward
-	TPM1_C1V = 7500/2;	//Bot right Reverse
+	TPM1_C1V = 7500/1.8;	//Bot right Reverse
 }
 
 void turnLeft(){
-	TPM2_C0V = 0; 			//Bot left Forward
-	TPM2_C1V = 7500/2; 	//Bot left Reverse
+	TPM0_C0V = 0; 			//Bot left Forward
+	TPM0_C1V = 7500/1.8; 	//Bot left Reverse
 	TPM0_C2V = 0;				//Top left Forward
-	TPM0_C3V = 7500/2;	//Top left Reverse
-	TPM0_C4V = 7500/2;	//Top right Forward
+	TPM0_C3V = 7500/1.8;	//Top left Reverse
+	TPM0_C4V = 7500/1.8;	//Top right Forward
 	TPM0_C5V = 0;				//Top right Reverse
-	TPM1_C0V = 7500/2;	//Bot right Forward
+	TPM1_C0V = 7500/1.8;	//Bot right Forward
 	TPM1_C1V = 0;				//Bot right Reverse
 }
 
 void forwardRight(){
- 	TPM2_C0V = 7500; 	//Bot left Forward
-	TPM2_C1V = 0; 			//Bot left Reverse
-	TPM0_C2V = 7500;	//Top left Forward
+ 	TPM0_C0V = 7500; 		//Bot left Forward
+	TPM0_C1V = 0; 			//Bot left Reverse
+	TPM0_C2V = 7500;		//Top left Forward
 	TPM0_C3V = 0;				//Top left Reverse
-	TPM0_C4V = 7500/10;//Top right Forward
+	TPM0_C4V = 7500/50;	//Top right Forward
 	TPM0_C5V = 0;				//Top right Reverse
-	TPM1_C0V = 7500/10;//Bot right Forward
+	TPM1_C0V = 7500/50;	//Bot right Forward
 	TPM1_C1V = 0;				//Bot right Reverse
 }
 
 void forwardLeft(){
-	TPM2_C0V = 7500/10; 	//Bot left Forward
-	TPM2_C1V = 0; 				//Bot left Reverse
-	TPM0_C2V = 7500/10;	//Top left Forward
+	TPM0_C0V = 7500/100; 	//Bot left Forward
+	TPM0_C1V = 0; 				//Bot left Reverse
+	TPM0_C2V = 7500/100;		//Top left Forward
 	TPM0_C3V = 0;					//Top left Reverse
-	TPM0_C4V = 7500;		//Top right Forward
+	TPM0_C4V = 7500;			//Top right Forward
 	TPM0_C5V = 0;					//Top right Reverse
-	TPM1_C0V = 7500;		//Bot right Forward
+	TPM1_C0V = 7500;			//Bot right Forward
 	TPM1_C1V = 0;					//Bot right Reverse
 }
-
 
 void movement (void *argument) {
 	//To implement mutext or Queue to not waste CPU cycles.
@@ -268,101 +472,114 @@ void movement (void *argument) {
 	}
 }
 
-void autonomousMovement(void *argument) {
-	//osSemaphoreAcquire(autoSelect, osWaitForever);
-	initIRSensor();
-	NVIC_EnableIRQ(PORTA_IRQn);
-	for(;;) {
-		//Move forward for a certain distance until Front_IR Triggers
-		osDelay(400);
-	//	forward();
-	//	if(front_Sensor_Trigger == 1) {
-		// When IR_Sensor goes Low.
-			//NVIC_DisableIRQ(PORTA_IRQn);
-			//triggered+=1;
-			//if(portA_Handler_Counter >= 1) {
-			//	osDelay(400);
-			//  stopBot();
+
+void goRoundTheObstacle(){
+			  osDelay(300);
+				stopBot();
 				osDelay(400);
-				turnLeft();
-				osDelay(1000);
+				turnLeft(); //1st turn
+				osDelay(500);
 			  forward();
-			  osDelay(1000);
-			  turnRight();
-				osDelay(1000);
+				osDelay(500);
+				turnRight(); // 2nd turn
+				osDelay(700);
+    		forward();
+				osDelay(700);
+			  turnRight(); // 3rd turn
+				osDelay(950);
 			  forward();
-				osDelay(2000);
-			  turnRight();
-				osDelay(1000);
-			  forward();
-				osDelay(2000);
-			  turnRight();
-				osDelay(1000);
-				forward();
-				osDelay(1000);
-				turnRight();
-				osDelay(1000);
+		//
+				osDelay(700);
+			  turnRight(); // 4th turn
+				osDelay(850);
 				forward();
 				osDelay(500);
-				turnLeft();
-				osDelay(1000);
+				turnLeft(); // 6th turn
+				osDelay(400);
 				forward();
-				front_Sensor_Trigger = 2;
-				NVIC_EnableIRQ(PORTA_IRQn);
-	//		}
-		
-	//		if(front_Sensor_Trigger == 3) {
-	//			osDelay(400);
-	//			stopBot();
-	//		}
-				//NVIC_DisableIRQ(PORTA_IRQn);
-			//}
-			//osDelay(400);
-			//stopBot();
-			//turnLeft();
-			//osDelay(10000);
-			//front_Sensor_Trigger = 0;
-			//front_Sensor_Trigger = 0;
-		//}
-		
-		/*if(back_Sensor_Trigger >= 1) {
-				// Whne Back IR_Sensor goes Low
-				stopBot();
-				//turnRight();
 				osDelay(1000);
-				//stopBot();
-				back_Sensor_Trigger = 0;
-			}*/
-		//Stop Button for E-Stop
-		/*if (rx_data == 0x0b) {
-			stopBot();
-		}*/
-	}
+				stopBot();
+				osDelay(300);
+
+/*
+	
+				turnRight(); // 5th turn
+				osDelay(700);
+				forward();
+				osDelay(500);
+				turnLeft(); // 6th turn
+				osDelay(500);
+				stopBot();
+				osDelay(500);
+			//	forward();
+			*/
 }
 
+
+
+void autonomousMovement(void *argument) {
+	//osSemaphoreAcquire(autoSelect, osWaitForever);
+	//initIRSensor();
+	init_pit();
+	initGreenStrip();
+	osDelay(400);
+	forward();
+	for(;;) {
+		//Move forward for a certain distance until Front_IR Triggers
+		//if(front_Sensor_Trigger >= 1 && went_round_obstacle == 0) {
+		isdetect = detect();
+		if(isdetect) {
+		PTD ->PSOR = (MASK(GREEN_LED)); 
+			goRoundTheObstacle();
+		//	went_round_obstacle = 1;
+		 // front_Sensor_Trigger = 0;
+			break;
+		
+		//	NVIC_EnableIRQ(PORTA_IRQn);
+	//	} else if (front_Sensor_Trigger >= 1 && went_round_obstacle == 1){
+		//	osDelay(400);
+		//	stopBot();
+		//}
+	}else if(isdetect){
+		PTD ->PCOR = (MASK(GREEN_LED)); 
+	}
+}
+	PTD ->PCOR = (MASK(GREEN_LED)); 
+}
+
+void movechecker(){
+	osDelay(400);
+	forward();
+	while(1){
+	}
+}
  
 int main (void) {
  
   // System Initialization
   SystemCoreClockUpdate();
 	initPWM();
+	initGreenPin();
+	PTD ->PCOR = (MASK(GREEN_LED));
 	
 	int flag = 0;
-	TPM2_C0V = 0;
-	TPM2_C1V = 0;
+	TPM0_C0V = 0;
+	TPM0_C1V = 0;
 	
 	TPM0_C2V = 0;
 	TPM0_C3V = 0;
+	
 	
 	TPM0_C4V = 0;
 	TPM0_C5V = 0;
 	
 	TPM1_C0V = 0;
-	TPM1_C1V = 0;	
-  // ...
-	
+	TPM1_C1V = 0;
+	//init_pit();
+
   osKernelInitialize();                 // Initialize CMSIS-RTOS
-	autoSelect = osSemaphoreNew(1,1,NULL);
+	//autoSelect = osSemaphoreNew(1,1,NULL);
+	//osThreadNew(movechecker, NULL, NULL);   
   //osThreadNew(app_main, NULL, NULL);   // Create application main thread
 	//osThreadNew(movement, NULL, NULL); 		//Thread for movements
 	osThreadNew(autonomousMovement,NULL,NULL);
@@ -370,4 +587,5 @@ int main (void) {
   //int flag = 0;
 	for (;;) {
 	}
+	
 }
