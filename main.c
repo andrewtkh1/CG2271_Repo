@@ -10,17 +10,25 @@
 #include "cmsis_os2.h"
 #include "movements.h"
 #include "LEDControl.h"
+#include "buzzer.h"
+//#include "autoMoves.h"
+//#include "autoMoves.c"
 
 //Variables for interrupt
 //#define BAUD_RATE 115200
 #define BAUD_RATE 9600
 #define UART_RX_PORTE23 23
 #define UART2_INT_PRIO 64
- uint16_t rx_data = 0x00;
-int counter = 0;
-#define MASK(x) (1 << (x)) 
+#define MASK(x) (1 << (x))
 
-osSemaphoreId_t movementData;
+
+
+volatile uint16_t rx_data = 0x00;
+uint16_t moveData = 0x0;
+int counter = 0;
+int debounce = 0;
+
+osSemaphoreId_t recieveData, manualMode, autoMode;
 osMessageQueueId_t movementQ;
 
 void initUART2Interrupt(){
@@ -78,7 +86,7 @@ void UART2_IRQHandler(void){
 			rx_data = UART2->D;
 			counter++;
 			//osMessageQueuePut(movementQ, &rx_data, NULL, 0);
-			osSemaphoreRelease(movementData);
+			osSemaphoreRelease(recieveData);
 		 }
 		 
 		 if (UART2->S1 & UART_S1_TDRE_MASK) {
@@ -90,79 +98,107 @@ void UART2_IRQHandler(void){
 			UART_S1_NF_MASK | 
 			UART_S1_FE_MASK | 
 			UART_S1_PF_MASK)) {
-				int s = 0;
 			}
 }
 
-//Thread for Red LED
-void blinkRedLED(void *argument){
-	while(1){
-		//Turn on the RED LEDs
-		PTB->PSOR = (MASK(RED_LED5) | MASK(RED_LED6) | MASK(RED_LED7) | MASK(RED_LED8)| MASK(RED_LED9)| MASK(RED_LED10));
-		PTE->PSOR = (MASK(RED_LED1) | MASK(RED_LED2) | MASK(RED_LED3) | MASK(RED_LED4));
-	
-		if(isMoving == 1){
-			osDelay(500);
-		}else{
-			osDelay(250);
-		}
-		//Turn off the RED LEDs
-		PTB->PCOR = (MASK(RED_LED5) | MASK(RED_LED6) | MASK(RED_LED7) | MASK(RED_LED8)| MASK(RED_LED9)| MASK(RED_LED10));
-		PTE->PCOR = (MASK(RED_LED1) | MASK(RED_LED2) | MASK(RED_LED3) | MASK(RED_LED4));
-	
-		if(isMoving == 1){
-			osDelay(500);
-		}else{
-			osDelay(250);
+int moveCounter = 0;
+void movement (void *argument) {
+	//To implement mutext or Queue to not waste CPU cycles.
+	//uint16_t rx_data;
+	osSemaphoreAcquire(manualMode,osWaitForever); //Means it is maunal mode.
+	for(;;){
+		//osMessageQueueGet(movementQ, &rx_data1, NULL, osWaitForever);
+		//osDelay(30);
+		//rx_data = rx_data1;
+		//moveCounter++;
+		switch (moveData){
+			case 0x0:
+				stopBot();
+				isMoving = 0;
+				break;
+			case 0x1:
+				forward();
+				isMoving = 1;
+				break;
+			case 0x2:
+				reverse();
+				isMoving = 1;
+				break;
+			case 0x3:
+				turnLeft();
+				isMoving = 1;
+				break;
+			case 0x4:
+				turnRight();
+				isMoving = 1;
+				break;
+			case 0x5:
+				forwardRight();
+				isMoving = 1;
+				break;
+			case 0x6:
+				forwardLeft();
+				isMoving = 1;
+				break;
 		}
 	}
 }
 
-void blinkGreenLED(void *argument){
+void decode (void *argument) {
 	while(1){
-		if (isMoving == 1){
-			runMode();
-		} else {
-			stationaryMode();
+		osSemaphoreAcquire(recieveData, osWaitForever);
+		if (rx_data <= 0x6){
+			moveData = rx_data;
+			osSemaphoreRelease(manualMode);
+		}
+		if (rx_data == 0x07){
+			//RUN AUTO FUNCTION.
+			osSemaphoreRelease(autoMode);
+		}
+		if (rx_data == 0x08){
+			isFinished = 0;
+		}
+		if (rx_data == 0x09){
+			isFinished = 1;
 		}
 	}
 }
-int moveCounter = 0;
-void movement (void *argument) {
-	//To implement mutext or Queue to not waste CPU cycles.
-	uint16_t rx_data1;
-	for(;;){
-		//osSemaphoreAcquire(movementData, osWaitForever);
-		//osMessageQueueGet(movementQ, &rx_data1, NULL, osWaitForever);
-		//rx_data = rx_data1;
-		moveCounter++;
-		//if (rx_data == 0x0) {
-			//stopBot();
-			//isMoving = 0;
-		if (rx_data == 0x1) {
-			forward();
-			isMoving = 1;
-		} else if (rx_data == 0x2) {
-			reverse();
-			isMoving = 1;
-		} else if (rx_data == 0x3) {
-			turnLeft();
-			isMoving = 1;
-		} else if (rx_data == 0x4) {
-			turnRight();
-			isMoving = 1;
-		} else if (rx_data == 0x5) {
-			forwardRight();
-			isMoving = 1;
-		} else if (rx_data == 0x6) {
-			forwardLeft();
-			isMoving = 1;
-		} else {
-			stopBot();
+
+void autonomousMovement(void *argument) {
+	osSemaphoreAcquire(autoMode, osWaitForever);
+	//initIRSensor();
+	init_pit();
+	initGreenPin();
+	osDelay(400);
+	forward();
+	osDelay(300);
+	isMoving = 1;
+	for(;;) {
+		//Move forward for a certain distance until Front_IR Triggers
+		isdetect = detect();
+		if (isdetect >= 1){
+			PTD ->PSOR = (MASK(GREEN_LED));
+			debounce = debounce + 1;
+		} else{
+			PTD ->PCOR = (MASK(GREEN_LED)); 
+			debounce = 0;
+		}
+		
+		if(debounce >= 4 && went_round_obstacle == 0) {
+				goRoundTheObstacle();
+				went_round_obstacle = 1;
+			isFinished = 1;
 			isMoving = 0;
+		
+	//	} else if (isdetect && went_round_obstacle == 1){
+	//		osDelay(300);
+	//		stopBot();
+	//		osDelay(300);
+		//}
 		}
 	}
 }
+
  
 const osThreadAttr_t moveAtr = {
   .priority = osPriorityHigh                    //Set initial thread priority to high   
@@ -176,17 +212,28 @@ int main (void) {
 	initPWM();
 	initUART2(BAUD_RATE);
 	initRedLED();
+	initGreenStrip();
+	initBuzzer();
+	
   // ...
 	
-	
-	
   osKernelInitialize();                 // Initialize CMSIS-RTOS
-	//osThreadNew(movement,NULL, &moveAtr); 		//Thread for movements
+	//osThreadNew(movement,NULL, &moveAtr); 		//Thread for movements priorty
 	//movementQ = osMessageQueueNew(3,sizeof(rx_data), NULL);
+	
+	//threads
 	osThreadNew(movement, NULL, NULL);
 	osThreadNew(blinkRedLED, NULL, NULL);
-	//osThreadNew(blinkGreenLED, NULL, NULL);
-	movementData = osSemaphoreNew(1,0,NULL);
+	osThreadNew(blinkGreenLED, NULL, NULL);
+	osThreadNew(buzzer, NULL, NULL);
+	osThreadNew(decode,NULL, NULL);
+	osThreadNew(autonomousMovement, NULL, NULL);
+	
+	//semaphores
+	recieveData = osSemaphoreNew(1,0,NULL);
+	manualMode = osSemaphoreNew(1,0,NULL);
+	autoMode = osSemaphoreNew(1,0,NULL);
+	
   osKernelStart();                      // Start thread execution
   //int flag = 0;
 	for (;;) {

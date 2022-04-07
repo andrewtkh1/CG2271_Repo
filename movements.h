@@ -6,6 +6,11 @@
 #include "system_MKL25Z4.h"   	         // Keil::Device:Startup
 #include "cmsis_os2.h"
 
+#define TRIGGER 12 // PORTC PIN 12 Ultrasonic Trigger
+#define ECHO 13 // PORTC PIN 13 Ultrasonic Trigger
+#define PORTA_INT_PRIO 1
+#define GREEN_1  7// port C pin 7
+#define GREEN_LED 7 // PORT D Pin 7
 
 #define TOP_LEFT_WHEEL_FWD	30 					// PORT E pin 30 TM0 CH2 FWD
 #define TOP_LEFT_WHEEL_REV	29 					// PORT E pin 29 TM0 CH3 REV
@@ -26,6 +31,20 @@
 					TPM1_C0V = Bot right Forward
 					TPM1_C1V = Bot right Reverse
 */
+
+volatile int front_Sensor_Trigger = -1;
+//volatile int portA_Handler_Counter = -1;
+volatile int back_Sensor_Trigger = 0;
+//volatile int portD_Handler_Counter = -1;
+//1 means the robot has went round the obstacle.
+int went_round_obstacle = 0;
+
+int volatile auto_Counter;
+int volatile wait_delay;
+int volatile duration = 10000;
+int volatile isdetect;
+
+volatile int triggered = 0;
 
 void initPWM(){
 	SIM->SCGC5 |= SIM_SCGC5_PORTA_MASK;
@@ -121,6 +140,91 @@ void initPWM(){
 	TPM1_C1V = 0;
 }
 
+void initGreenPin(){
+	//SIM->SCGC5 |= SIM_SCGC5_PORTD_MASK;
+	PORTD->PCR[GREEN_LED] &= ~PORT_PCR_MUX_MASK;
+	PORTD->PCR[GREEN_LED] |= PORT_PCR_MUX(1);
+	PTD->PDDR |= MASK(GREEN_LED);
+}
+
+//The PIT Interrupt for Ultrasonic sensor. Adapted from https://github.com/judowha/cg2271_project/blob/master/main.c
+void init_pit(){
+	//SIM->SCGC5 |= SIM_SCGC5_PORTC_MASK;
+	PORTC->PCR[TRIGGER] &= ~PORT_PCR_MUX_MASK;
+	PORTC->PCR[TRIGGER] |= PORT_PCR_MUX(1);
+	PORTC->PCR[ECHO] &= ~PORT_PCR_MUX_MASK;
+	PORTC->PCR[ECHO] |= PORT_PCR_MUX(1);
+	
+	PTC->PDDR |= MASK(TRIGGER);
+	PTC->PDDR &= ~MASK(ECHO);
+	
+	
+	SIM->SCGC6 |= SIM_SCGC6_PIT_MASK;
+	PIT->MCR = 0;
+	
+	PIT->CHANNEL[0].LDVAL = 47;
+	PIT->CHANNEL[0].TCTRL |= PIT_TCTRL_TIE_MASK | PIT_TCTRL_TEN_MASK;
+	
+	NVIC_SetPriority(PIT_IRQn,2);
+	NVIC_ClearPendingIRQ(PIT_IRQn);
+	NVIC_EnableIRQ(PIT_IRQn);
+}
+
+//Adapted from https://github.com/judowha/cg2271_project/blob/master/main.c
+void PIT_IRQHandler(){
+	if(PIT->CHANNEL[0].TFLG & PIT_TFLG_TIF_MASK){
+		PIT->CHANNEL[0].TFLG &= PIT_TFLG_TIF_MASK;
+		auto_Counter--;
+		if(auto_Counter == 0){
+			PIT->CHANNEL[0].TCTRL &= ~PIT_TCTRL_TEN_MASK;
+			wait_delay = 0;
+		}
+	}
+}
+
+//Adapted from https://github.com/judowha/cg2271_project/blob/master/main.c
+int detect(void){
+	PTC->PDOR &= ~MASK(TRIGGER);
+	wait_delay = 1;
+	auto_Counter = 2;
+	PIT->CHANNEL[0].TCTRL |= PIT_TCTRL_TEN_MASK;
+	while(wait_delay);
+	
+	PTC->PDOR |= MASK(TRIGGER);
+	wait_delay = 1;
+	auto_Counter = 10;
+	PIT->CHANNEL[0].TCTRL |= PIT_TCTRL_TEN_MASK;
+	while(wait_delay);
+	
+	PTC->PDOR &= ~MASK(TRIGGER);
+	
+	wait_delay = 1;
+	auto_Counter = 10000;
+	PIT->CHANNEL[0].TCTRL |= PIT_TCTRL_TEN_MASK;
+	
+	while ((PTC->PDIR & MASK(ECHO)) == 0){
+		if(!wait_delay){
+			duration = 200000;
+			return -1;
+		}
+	}
+	while ((PTC->PDIR & MASK(ECHO)) == MASK(ECHO)){
+		if(!wait_delay){
+			duration = 200000;
+			return -1;
+		}
+	}
+	
+	duration = 10000 - auto_Counter;
+	
+	//Change here
+	if(duration <= 1150) //Prev is 2200
+		return 1;
+	else return 0;
+}
+
+// 0xEA6 = 50% duty cycle.
+
 void stopBot(){
 	TPM0_C0V = 0;
 	TPM0_C1V = 0;
@@ -156,24 +260,24 @@ void reverse(){
 }
 
 void turnRight(){
-	TPM0_C0V = 7500/1.8; 	//Bot left Forward
+	TPM0_C0V = 7500/1.5; 	//Bot left Forward
 	TPM0_C1V = 0;				//Bot left Reverse
-	TPM0_C2V = 7500/1.8;	//Top left Forward
+	TPM0_C2V = 7500/1.5;	//Top left Forward
 	TPM0_C3V = 0;				//Top left Reverse
 	TPM0_C4V = 0;				//Top right Forward
-	TPM0_C5V = 7500/1.8;	//Top right Reverse
+	TPM0_C5V = 7500/1.5;	//Top right Reverse
 	TPM1_C0V = 0;				//Bot right Forward
-	TPM1_C1V = 7500/1.8;	//Bot right Reverse
+	TPM1_C1V = 7500/1.5;	//Bot right Reverse
 }
 
 void turnLeft(){
 	TPM0_C0V = 0; 			//Bot left Forward
-	TPM0_C1V = 7500/1.8; 	//Bot left Reverse
+	TPM0_C1V = 7500/1.5; 	//Bot left Reverse
 	TPM0_C2V = 0;				//Top left Forward
-	TPM0_C3V = 7500/1.8;	//Top left Reverse
-	TPM0_C4V = 7500/1.8;	//Top right Forward
+	TPM0_C3V = 7500/1.5;	//Top left Reverse
+	TPM0_C4V = 7500/1.5;	//Top right Forward
 	TPM0_C5V = 0;				//Top right Reverse
-	TPM1_C0V = 7500/1.8;	//Bot right Forward
+	TPM1_C0V = 7500/1.5;	//Bot right Forward
 	TPM1_C1V = 0;				//Bot right Reverse
 }
 
@@ -182,19 +286,70 @@ void forwardRight(){
 	TPM0_C1V = 0; 			//Bot left Reverse
 	TPM0_C2V = 7500;		//Top left Forward
 	TPM0_C3V = 0;				//Top left Reverse
-	TPM0_C4V = 7500/50;	//Top right Forward
+	TPM0_C4V = 7500/25;	//Top right Forward
 	TPM0_C5V = 0;				//Top right Reverse
-	TPM1_C0V = 7500/50;	//Bot right Forward
+	TPM1_C0V = 7500/25;	//Bot right Forward
 	TPM1_C1V = 0;				//Bot right Reverse
 }
 
 void forwardLeft(){
-	TPM0_C0V = 7500/100; 	//Bot left Forward
+	TPM0_C0V = 7500/25; 	//Bot left Forward
 	TPM0_C1V = 0; 				//Bot left Reverse
-	TPM0_C2V = 7500/100;		//Top left Forward
+	TPM0_C2V = 7500/25;		//Top left Forward
 	TPM0_C3V = 0;					//Top left Reverse
 	TPM0_C4V = 7500;			//Top right Forward
 	TPM0_C5V = 0;					//Top right Reverse
 	TPM1_C0V = 7500;			//Bot right Forward
 	TPM1_C1V = 0;					//Bot right Reverse
 }
+
+void turnRightAuto(){
+	TPM0_C0V = 7500/1.2; 	//Bot left Forward
+	TPM0_C1V = 0;				//Bot left Reverse
+	TPM0_C2V = 7500/1.2;	//Top left Forward
+	TPM0_C3V = 0;				//Top left Reverse
+	TPM0_C4V = 0;				//Top right Forward
+	TPM0_C5V = 7500/1.2;	//Top right Reverse
+	TPM1_C0V = 0;				//Bot right Forward
+	TPM1_C1V = 7500/1.2;	//Bot right Reverse
+}
+
+void turnLeftAuto(){
+	TPM0_C0V = 0; 			//Bot left Forward
+	TPM0_C1V = 7500/1.2; 	//Bot left Reverse
+	TPM0_C2V = 0;				//Top left Forward
+	TPM0_C3V = 7500/1.2;	//Top left Reverse
+	TPM0_C4V = 7500/1.2;	//Top right Forward
+	TPM0_C5V = 0;				//Top right Reverse
+	TPM1_C0V = 7500/1.2;	//Bot right Forward
+	TPM1_C1V = 0;				//Bot right Reverse
+}
+
+void goRoundTheObstacle(){
+			  osDelay(300);
+				stopBot();
+				osDelay(400);
+				turnLeftAuto(); //1st turn
+				osDelay(450);
+				forward();
+				osDelay(560);
+				turnRightAuto(); // 2nd turn
+				osDelay(560);//     		
+				forward();
+				osDelay(650);
+			  turnRightAuto(); // 3rd turn
+				osDelay(825);	//j //STOP HERE
+				forward();
+				osDelay(650);
+				turnRightAuto();
+				osDelay(500);
+				forward();
+				osDelay(800);	//725
+				turnLeftAuto();
+				osDelay(400);
+				forward();
+				osDelay(900);
+				stopBot();
+				osDelay(400);
+}
+
