@@ -292,6 +292,17 @@ void forwardRight(){
 	TPM1_C1V = 0;				//Bot right Reverse
 }
 
+void forwardRightAuto(){
+ 	TPM0_C0V = 7500/1.25; 		//Bot left Forward
+	TPM0_C1V = 0; 			//Bot left Reverse
+	TPM0_C2V = 7500/1.2;		//Top left Forward
+	TPM0_C3V = 0;				//Top left Reverse
+	TPM0_C4V = 500;	//Top right Forward
+	TPM0_C5V = 0;				//Top right Reverse
+	TPM1_C0V = 500;	//Bot right Forward (Orignal was 5.
+	TPM1_C1V = 0;				//Bot right Reverse
+}
+
 void forwardLeft(){
 	TPM0_C0V = 7500/25; 	//Bot left Forward
 	TPM0_C1V = 0; 				//Bot left Reverse
@@ -325,31 +336,118 @@ void turnLeftAuto(){
 	TPM1_C1V = 0;				//Bot right Reverse
 }
 
+void goUpRight(){
+	osDelay(300);
+	stopBot();
+	osDelay(400);
+	turnLeftAuto(); //1st turn
+	osDelay(400);//OG is 330
+	stopBot();
+	osDelay(200);
+	forwardRightAuto();
+	osDelay(1200);
+	stopBot();
+	osDelay(500);
+	forwardRightAuto();
+	osDelay(2700);
+	stopBot();
+	osDelay(300);
+	turnLeftAuto(); //5th turn
+	osDelay(370);
+	stopBot();
+	osDelay(400);
+	forward();
+	osDelay(200);
+}
+
 void goRoundTheObstacle(){
 			  osDelay(300);
 				stopBot();
 				osDelay(400);
 				turnLeftAuto(); //1st turn
-				osDelay(450);
+				osDelay(330);
+				stopBot();
+				osDelay(200);
 				forward();
-				osDelay(560);
+				osDelay(730);
+				stopBot();
+				osDelay(200);
 				turnRightAuto(); // 2nd turn
-				osDelay(560);//     		
+				osDelay(560);//
+				stopBot();
+				osDelay(200);
 				forward();
-				osDelay(650);
+				osDelay(730);
+				stopBot();
+				osDelay(200);
 			  turnRightAuto(); // 3rd turn
-				osDelay(825);	//j //STOP HERE
+				osDelay(560);	//j //STOP HERE
+				stopBot();
+				osDelay(200);
 				forward();
-				osDelay(650);
-				turnRightAuto();
-				osDelay(500);
+				osDelay(730);
+				stopBot();
+				osDelay(200);
+				turnRightAuto(); //4th turn
+				osDelay(560);
+				stopBot();
+				osDelay(200);
 				forward();
-				osDelay(800);	//725
-				turnLeftAuto();
-				osDelay(400);
+				osDelay(730);	//725
+				stopBot();
+				osDelay(200);
+				turnLeftAuto(); //5th turn
+				osDelay(330);
+				stopBot();
+				osDelay(300);
 				forward();
 				osDelay(900);
 				stopBot();
 				osDelay(400);
 }
-
+//for inside box
+//void goRoundTheObstacle(){
+//			  osDelay(300);
+//				stopBot();
+//				osDelay(400);
+//				turnLeftAuto(); //1st turn
+//				osDelay(410);
+//				stopBot();
+//				osDelay(200);
+//				forward();
+//				osDelay(630);
+//				stopBot();
+//				osDelay(200);
+//				turnRightAuto(); // 2nd turn
+//				osDelay(560);//
+//				stopBot();
+//				osDelay(200);
+//				forward();
+//				osDelay(650);
+//				stopBot();
+//				osDelay(200);
+//			  turnRightAuto(); // 3rd turn
+//				osDelay(590);	//j //STOP HERE
+//				stopBot();
+//				osDelay(200);
+//				forward();
+//				osDelay(650);
+//				stopBot();
+//				osDelay(200);
+//				turnRightAuto(); //4th turn
+//				osDelay(500);
+//				stopBot();
+//				osDelay(200);
+//				forward();
+//				osDelay(850);	//725
+//				stopBot();
+//				osDelay(200);
+//				turnLeftAuto(); //5th turn
+//				osDelay(330);
+//				stopBot();
+//				osDelay(300);
+//				forward();
+//				osDelay(900);
+//				stopBot();
+//				osDelay(400);
+//}
