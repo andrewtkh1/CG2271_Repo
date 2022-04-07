@@ -399,33 +399,34 @@ void goRoundTheObstacle(){
 
 
 void autonomousMovement(void *argument) {
-	//osSemaphoreAcquire(autoSelect, osWaitForever);
+	//osSemaphoreAcquire(autoMode, osWaitForever);
 	//initIRSensor();
 	init_pit();
-	initGreenStrip();
+	initGreenPin();
 	osDelay(400);
 	forward();
+	osDelay(300);
 	for(;;) {
 		//Move forward for a certain distance until Front_IR Triggers
 		isdetect = detect();
 		if (isdetect >= 1){
 			PTD ->PSOR = (MASK(GREEN_LED));
+			debounce = debounce + 1;
 		} else{
 			PTD ->PCOR = (MASK(GREEN_LED)); 
+			debounce = 0;
 		}
 		
-	if(isdetect && went_round_obstacle == 0) {
-			goRoundTheObstacle();
-			went_round_obstacle = 1;
+		if(debounce >= 4 && went_round_obstacle == 0) {
+				goRoundTheObstacle();
+				went_round_obstacle = 1;
 		
-	//	} else if (isdetect && went_round_obstacle == 1){
-	//		osDelay(300);
-	//		stopBot();
-	//		osDelay(300);
-		//}
+		} else if (debounce >= 4 && went_round_obstacle == 1){
+			osDelay(300);
+			stopBot();
+			osDelay(300);
+		}
 	}
-	
-}
 }
 
 void movechecker(){
