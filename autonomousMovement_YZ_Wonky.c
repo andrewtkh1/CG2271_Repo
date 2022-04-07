@@ -132,7 +132,7 @@ int detect(void){
 	duration = 10000 - counter;
 	
 	//Change here
-	if(duration <=2200)
+	if(duration <=2400)
 		return 1;
 	else return 0;
 
@@ -287,14 +287,14 @@ void turnRight(){
 }
 
 void turnRightAuto(){
-	TPM0_C0V = 7500; 	//Bot left Forward
+	TPM0_C0V = 7500/1.2; 	//Bot left Forward
 	TPM0_C1V = 0;				//Bot left Reverse
-	TPM0_C2V = 7500;	//Top left Forward
+	TPM0_C2V = 7500/1.2;	//Top left Forward
 	TPM0_C3V = 0;				//Top left Reverse
 	TPM0_C4V = 0;				//Top right Forward
-	TPM0_C5V = 7500;	//Top right Reverse
+	TPM0_C5V = 7500/1.2;	//Top right Reverse
 	TPM1_C0V = 0;				//Bot right Forward
-	TPM1_C1V = 7500;	//Bot right Reverse
+	TPM1_C1V = 7500/1.2;	//Bot right Reverse
 }
 
 void turnLeft(){
@@ -310,12 +310,12 @@ void turnLeft(){
 
 void turnLeftAuto(){
 	TPM0_C0V = 0; 			//Bot left Forward
-	TPM0_C1V = 7500; 	//Bot left Reverse
+	TPM0_C1V = 7500/1.2; 	//Bot left Reverse
 	TPM0_C2V = 0;				//Top left Forward
-	TPM0_C3V = 7500;	//Top left Reverse
-	TPM0_C4V = 7500;	//Top right Forward
+	TPM0_C3V = 7500/1.2;	//Top left Reverse
+	TPM0_C4V = 7500/1.2;	//Top right Forward
 	TPM0_C5V = 0;				//Top right Reverse
-	TPM1_C0V = 7500;	//Bot right Forward
+	TPM1_C0V = 7500/1.2;	//Bot right Forward
 	TPM1_C1V = 0;				//Bot right Reverse
 }
 
@@ -356,28 +356,43 @@ void goRoundTheObstacle(){
 				stopBot();
 				osDelay(400);
 				turnLeftAuto(); //1st turn
-				osDelay(270);
+				osDelay(450);
 				forward();
-				osDelay(500);
+				osDelay(560);
 				turnRightAuto(); // 2nd turn
-				osDelay(510);//     		
+				osDelay(560);//     		
 				forward();
-				osDelay(675);
+				osDelay(650);
 			  turnRightAuto(); // 3rd turn
-				osDelay(525);	//j //STOP HERE
-			  forward();
-				osDelay(680);
-			  turnRightAuto(); // 4th turn
-				osDelay(510);//
+				osDelay(825);	//j //STOP HERE
 				forward();
-				osDelay(665);
+				osDelay(650);
+				turnRightAuto();
+				osDelay(500);
+				forward();
+				osDelay(800);	//725
+				turnLeftAuto();
+				osDelay(400);
+				forward();
+				osDelay(900);
+				stopBot();
+				osDelay(400);
+			  /*forward();
+				osDelay(680);
+			  //turnRightAuto(); // 4th turn
+				//osDelay(510);//
+				turnRightAuto();
+				osDelay(380);
+				forward();
+				osDelay(615);
 				
 				turnLeftAuto(); // 6th turn
-				osDelay(325);
+				//osDelay(325);
+				osDelay(305);
 				forward();
 				osDelay(1100);
 				stopBot();
-				osDelay(400);
+				osDelay(400);*/
 
 }
 
