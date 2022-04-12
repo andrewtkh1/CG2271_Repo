@@ -117,7 +117,7 @@ void movement (void *argument) {
 				isMoving = 0;
 				break;
 			case 0x1:
-				forward();
+				forwardManual();
 				isMoving = 1;
 				break;
 			case 0x2:
@@ -133,8 +133,8 @@ void movement (void *argument) {
 				isMoving = 1;
 				break;
 			case 0x5:
-				//forwardRight();
-				forwardRightAuto();
+				forwardRight();
+				//forwardRightAuto();
 				isMoving = 1;
 				break;
 			case 0x6:
@@ -166,7 +166,7 @@ void decode (void *argument) {
 }
 
 void autonomousMovement(void *argument) {
-	//osSemaphoreAcquire(autoMode, osWaitForever);
+	osSemaphoreAcquire(autoMode, osWaitForever);
 	//initIRSensor();
 	init_pit();
 	initGreenPin();
@@ -186,8 +186,8 @@ void autonomousMovement(void *argument) {
 		}
 		
 		if(debounce >= 4 && went_round_obstacle == 0) {
-				//goRoundTheObstacle();
-			goUpRight();
+			goRoundTheObstacle();
+			//goUpRight();
 			went_round_obstacle = 1;
 			isFinished = 1;
 			isMoving = 0;
